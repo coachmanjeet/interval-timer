@@ -89,15 +89,22 @@
 
     <div class="card">
       <div class="field">
-        <label for="musicSelect">Workout music (free tracks)</label>
+        <label for="musicSelect">Workout music (high-energy rock)</label>
         <select id="musicSelect">
           <option value="">No music</option>
-          <option value="music/exhilarate.mp3" selected>Exhilarate</option>
-          <option value="music/run-amok.mp3">Run Amok</option>
-          <option value="music/volatile-reaction.mp3">Volatile Reaction</option>
-          <option value="music/machinations.mp3">Machinations</option>
+          <option value="music/kick-shock.mp3" selected>Kick Shock</option>
+          <option value="music/all-this.mp3">All This</option>
+          <option value="music/breakdown.mp3">Breakdown</option>
+          <option value="music/death-of-kings.mp3">Death of Kings</option>
         </select>
-        <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">Rest periods switch to a relaxing track automatically.</p>
+        <label for="musicRestSelect">Rest music (calm guitar)</label>
+        <select id="musicRestSelect">
+          <option value="music/greensleeves.mp3" selected>Greensleeves</option>
+          <option value="music/slow-burn.mp3">Slow Burn</option>
+          <option value="music/the-parting.mp3">The Parting</option>
+          <option value="music/meditation-impromptu-01.mp3">Meditation Impromptu (calm piano)</option>
+        </select>
+        <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">Music starts at Go, not during get-ready. Rest periods switch to your rest pick automatically.</p>
       </div>
       <div style="margin-top:12px">
         <label for="volInput" style="font-size:13px;color:#9ca3af">Music volume</label>
@@ -127,13 +134,20 @@
     </div>
     <div class="card" style="margin-top:14px">
       <div class="field">
-        <label for="musicSelect2">Music</label>
+        <label for="musicSelect2">Workout music</label>
         <select id="musicSelect2">
           <option value="">No music</option>
-          <option value="music/exhilarate.mp3" selected>Exhilarate</option>
-          <option value="music/run-amok.mp3">Run Amok</option>
-          <option value="music/volatile-reaction.mp3">Volatile Reaction</option>
-          <option value="music/machinations.mp3">Machinations</option>
+          <option value="music/kick-shock.mp3" selected>Kick Shock</option>
+          <option value="music/all-this.mp3">All This</option>
+          <option value="music/breakdown.mp3">Breakdown</option>
+          <option value="music/death-of-kings.mp3">Death of Kings</option>
+        </select>
+        <label for="musicRestSelect2">Rest music</label>
+        <select id="musicRestSelect2">
+          <option value="music/greensleeves.mp3" selected>Greensleeves</option>
+          <option value="music/slow-burn.mp3">Slow Burn</option>
+          <option value="music/the-parting.mp3">The Parting</option>
+          <option value="music/meditation-impromptu-01.mp3">Meditation Impromptu (calm piano)</option>
         </select>
       </div>
     </div>
@@ -226,38 +240,44 @@ document.querySelectorAll("[data-preset]").forEach(function (b) {
 });
 updateTotal();
 
-// ---------- Music: workout track for work, relaxing track for rest ----------
+// ---------- Music: workout track for work, rest track for rest, silence during get-ready ----------
 var workAudio = $("musicWork"), restAudio = $("musicRest");
-restAudio.src = "music/meditation-impromptu-01.mp3";
 workAudio.volume = 0.7; restAudio.volume = 0.7;
 $("volInput").addEventListener("input", function () {
   workAudio.volume = $("volInput").value / 100;
   restAudio.volume = $("volInput").value / 100;
 });
-function syncMusicSelects(from) {
-  var other = from === "musicSelect" ? $("musicSelect2") : $("musicSelect");
-  other.value = $(from).value;
-  applyMusic();
+function syncPair(a, b) {
+  return function () {
+    $(b).value = $(a).value;
+    applyMusic();
+  };
 }
-function activeAudio() { return phase === "rest" ? restAudio : workAudio; }
+function activeAudio() {
+  if (phase === "rest") return restAudio;
+  if (phase === "work") return workAudio;
+  return null; // get-ready and done: clock sounds only, no music
+}
 function stopMusic() {
   workAudio.pause(); restAudio.pause();
   workAudio.currentTime = 0; restAudio.currentTime = 0;
 }
 function applyMusic() {
-  var src = $("musicSelect").value;
-  if (!src) { workAudio.pause(); restAudio.pause(); return; }
-  if (workAudio.getAttribute("src") !== src) { workAudio.src = src; }
-  if (running && !paused) {
-    var a = activeAudio(), other = a === workAudio ? restAudio : workAudio;
-    other.pause();
-    a.play().catch(function () {});
-  } else {
-    workAudio.pause(); restAudio.pause();
-  }
+  var workSrc = $("musicSelect").value;
+  var restSrc = $("musicRestSelect").value;
+  if (workAudio.getAttribute("src") !== workSrc) { workAudio.src = workSrc; }
+  if (restAudio.getAttribute("src") !== restSrc) { restAudio.src = restSrc; }
+  var a = activeAudio();
+  if (!workSrc || !a) { workAudio.pause(); restAudio.pause(); return; }
+  var other = a === workAudio ? restAudio : workAudio;
+  other.pause();
+  if (running && !paused) { a.play().catch(function () {}); }
+  else { a.pause(); }
 }
-$("musicSelect").addEventListener("change", function () { syncMusicSelects("musicSelect"); });
-$("musicSelect2").addEventListener("change", function () { syncMusicSelects("musicSelect2"); });
+$("musicSelect").addEventListener("change", syncPair("musicSelect", "musicSelect2"));
+$("musicSelect2").addEventListener("change", syncPair("musicSelect2", "musicSelect"));
+$("musicRestSelect").addEventListener("change", syncPair("musicRestSelect", "musicRestSelect2"));
+$("musicRestSelect2").addEventListener("change", syncPair("musicRestSelect2", "musicRestSelect"));
 
 // ---------- Timer engine ----------
 function showPhase() {
@@ -310,6 +330,7 @@ function startTimer() {
   $("setupView").style.display = "none";
   $("timerView").style.display = "block";
   $("musicSelect2").value = $("musicSelect").value;
+  $("musicRestSelect2").value = $("musicRestSelect").value;
   ctx(); // unlock audio on the tap
   speak("Get ready"); // also unlocks voice output on iOS for later cues
   running = true; paused = false; round = 1; elapsedMs = 0; elapsedBase = Date.now();
