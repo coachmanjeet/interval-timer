@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#16a34a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Interval Timer</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #111827; color: #fff; }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 20px 16px 40px; }
+  h1 { text-align: center; font-size: 28px; margin: 8px 0 4px; }
+  .sub { text-align: center; color: #9ca3af; margin: 0 0 20px; font-size: 14px; }
+  .card { background: #1f2937; border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+  .presets { display: flex; gap: 8px; flex-wrap: wrap; }
+  .presets button { flex: 1 1 45%; padding: 10px 6px; font-size: 14px; border: 0; border-radius: 10px; background: #374151; color: #fff; cursor: pointer; }
+  .presets button:active { background: #4b5563; }
+  .row { display: flex; gap: 12px; }
+  .field { flex: 1; }
+  .field label { display: block; font-size: 13px; color: #9ca3af; margin-bottom: 6px; }
+  .field input, .field select { width: 100%; padding: 12px; font-size: 18px; border: 0; border-radius: 10px; background: #374151; color: #fff; }
+  .total { text-align: center; color: #9ca3af; font-size: 14px; margin: 4px 0 12px; }
+  .big-btn { width: 100%; padding: 18px; font-size: 22px; font-weight: 700; border: 0; border-radius: 14px; background: #16a34a; color: #fff; cursor: pointer; }
+  .big-btn:active { background: #15803d; }
+  .check { display: flex; align-items: center; gap: 10px; font-size: 16px; padding: 6px 0; }
+  .check input { width: 22px; height: 22px; accent-color: #16a34a; }
+  input[type="range"] { width: 100%; accent-color: #16a34a; }
+  /* Timer view */
+  #timerView { display: none; }
+  .phase { border-radius: 20px; padding: 28px 16px 20px; text-align: center; transition: background 0.3s; }
+  .phase.ready { background: #d97706; }
+  .phase.work { background: #16a34a; }
+  .phase.rest { background: #2563eb; }
+  .phase.done { background: #6d28d9; }
+  .phase-label { font-size: 30px; font-weight: 800; letter-spacing: 2px; }
+  .clock { font-size: 96px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .round { font-size: 20px; margin-top: 6px; }
+  .bar { height: 12px; background: rgba(255,255,255,0.3); border-radius: 6px; margin-top: 16px; overflow: hidden; }
+  .bar > div { height: 100%; background: #fff; width: 0%; }
+  .elapsed { text-align: center; color: #d1d5db; margin-top: 10px; font-size: 14px; }
+  .controls { display: flex; gap: 10px; margin-top: 14px; }
+  .controls button { flex: 1; padding: 16px 6px; font-size: 17px; font-weight: 600; border: 0; border-radius: 12px; background: #374151; color: #fff; cursor: pointer; }
+  .controls button.primary { background: #16a34a; }
+  .controls button:active { opacity: 0.85; }
+  .foot { text-align: center; color: #6b7280; font-size: 12px; margin-top: 24px; line-height: 1.5; }
+  .foot a { color: #6b7280; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- SETUP -->
+  <div id="setupView">
+    <h1>Interval Timer</h1>
+    <p class="sub">Set it, press start, train. No account, no download.</p>
+
+    <div class="card">
+      <div class="presets">
+        <button data-preset="30,30,8">30 / 30 &times; 8</button>
+        <button data-preset="40,20,10">40 / 20 &times; 10</button>
+        <button data-preset="20,10,8">Tabata 20 / 10 &times; 8</button>
+        <button data-preset="60,30,10">60 / 30 &times; 10</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="field">
+          <label for="workInput">Work (seconds)</label>
+          <input id="workInput" type="number" inputmode="numeric" min="5" max="600" value="30">
+        </div>
+        <div class="field">
+          <label for="restInput">Rest (seconds)</label>
+          <input id="restInput" type="number" inputmode="numeric" min="0" max="600" value="30">
+        </div>
+        <div class="field">
+          <label for="roundsInput">Rounds</label>
+          <input id="roundsInput" type="number" inputmode="numeric" min="1" max="99" value="8">
+        </div>
+      </div>
+      <p class="total" id="totalLine"></p>
+    </div>
+
+    <div class="card">
+      <div class="field">
+        <label for="musicSelect">Workout music (free tracks)</label>
+        <select id="musicSelect">
+          <option value="">No music</option>
+          <option value="music/exhilarate.mp3" selected>Exhilarate</option>
+          <option value="music/run-amok.mp3">Run Amok</option>
+          <option value="music/volatile-reaction.mp3">Volatile Reaction</option>
+          <option value="music/machinations.mp3">Machinations</option>
+        </select>
+      </div>
+      <div style="margin-top:12px">
+        <label for="volInput" style="font-size:13px;color:#9ca3af">Music volume</label>
+        <input id="volInput" type="range" min="0" max="100" value="70">
+      </div>
+      <label class="check"><input id="soundToggle" type="checkbox" checked> Timer sounds on</label>
+    </div>
+
+    <button class="big-btn" id="startBtn">START</button>
+    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).</p>
+  </div>
+
+  <!-- TIMER -->
+  <div id="timerView">
+    <div class="phase ready" id="phaseBox">
+      <div class="phase-label" id="phaseLabel">GET READY</div>
+      <div class="clock" id="clock">0:05</div>
+      <div class="round" id="roundLabel">Round 1 of 8</div>
+      <div class="bar"><div id="barFill"></div></div>
+    </div>
+    <p class="elapsed" id="elapsedLine">Elapsed 0:00</p>
+    <div class="controls">
+      <button id="pauseBtn" class="primary">Pause</button>
+      <button id="skipBtn">Skip</button>
+      <button id="restartBtn">Restart</button>
+      <button id="endBtn">End</button>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="field">
+        <label for="musicSelect2">Music</label>
+        <select id="musicSelect2">
+          <option value="">No music</option>
+          <option value="music/exhilarate.mp3" selected>Exhilarate</option>
+          <option value="music/run-amok.mp3">Run Amok</option>
+          <option value="music/volatile-reaction.mp3">Volatile Reaction</option>
+          <option value="music/machinations.mp3">Machinations</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+</div>
+<audio id="music" loop preload="none"></audio>
+
+<script>
+"use strict";
+var $ = function (id) { return document.getElementById(id); };
+
+// ---------- Sound (synthesized, no files needed) ----------
+var audioCtx = null;
+function ctx() {
+  if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+  if (audioCtx.state === "suspended") { audioCtx.resume(); }
+  return audioCtx;
+}
+function beep(freq, dur, delay) {
+  if (!$("soundToggle").checked) return;
+  var c = ctx(); if (!c) return;
+  var t = c.currentTime + (delay || 0);
+  var o = c.createOscillator(), g = c.createGain();
+  o.type = "sine"; o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(c.destination);
+  o.start(t); o.stop(t + dur + 0.05);
+}
+function tick() { beep(880, 0.09); }
+function goSound() { beep(990, 0.12); beep(1320, 0.25, 0.14); }
+function workSound() { beep(660, 0.12); beep(990, 0.2, 0.14); }
+function restSound() { beep(440, 0.22); }
+function finishSound() { beep(523, 0.16); beep(659, 0.16, 0.18); beep(784, 0.3, 0.36); }
+
+// ---------- Wake lock (screen stays awake) ----------
+var wakeLock = null;
+function requestWake() {
+  if (!("wakeLock" in navigator)) return;
+  navigator.wakeLock.request("screen").then(function (l) { wakeLock = l; }).catch(function () {});
+}
+document.addEventListener("visibilitychange", function () {
+  if (document.visibilityState === "visible" && running && !paused) requestWake();
+});
+
+// ---------- Timer state ----------
+var workSec = 30, restSec = 30, rounds = 8;
+var phase = "ready", round = 1, phaseTotal = 5000, remaining = 5000;
+var endAt = 0, timerId = null, running = false, paused = false;
+var lastTickSec = -1, elapsedMs = 0, elapsedBase = 0;
+
+function fmt(ms) {
+  var s = Math.max(0, Math.ceil(ms / 1000));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+function totalMs() {
+  return 5000 + rounds * workSec * 1000 + Math.max(0, rounds - 1) * restSec * 1000;
+}
+function updateTotal() {
+  workSec = Math.min(600, Math.max(5, parseInt($("workInput").value, 10) || 30));
+  restSec = Math.min(600, Math.max(0, parseInt($("restInput").value, 10) || 0));
+  rounds = Math.min(99, Math.max(1, parseInt($("roundsInput").value, 10) || 8));
+  var t = totalMs();
+  $("totalLine").textContent = "Total workout: about " + Math.round(t / 60000) + " min (includes 5 sec get-ready)";
+}
+["workInput", "restInput", "roundsInput"].forEach(function (id) {
+  $(id).addEventListener("input", updateTotal);
+});
+document.querySelectorAll("[data-preset]").forEach(function (b) {
+  b.addEventListener("click", function () {
+    var p = b.dataset.preset.split(",");
+    $("workInput").value = p[0]; $("restInput").value = p[1]; $("roundsInput").value = p[2];
+    updateTotal();
+  });
+});
+updateTotal();
+
+// ---------- Music ----------
+var music = $("music");
+music.volume = 0.7;
+$("volInput").addEventListener("input", function () { music.volume = $("volInput").value / 100; });
+function syncMusicSelects(from) {
+  var other = from === "musicSelect" ? $("musicSelect2") : $("musicSelect");
+  other.value = $(from).value;
+  applyMusic();
+}
+function applyMusic() {
+  var src = $("musicSelect").value;
+  if (!src) { music.pause(); return; }
+  if (music.getAttribute("src") !== src) { music.src = src; }
+  if (running && !paused) { music.play().catch(function () {}); }
+}
+$("musicSelect").addEventListener("change", function () { syncMusicSelects("musicSelect"); });
+$("musicSelect2").addEventListener("change", function () { syncMusicSelects("musicSelect2"); });
+
+// ---------- Timer engine ----------
+function showPhase() {
+  var box = $("phaseBox");
+  box.className = "phase " + phase;
+  $("phaseLabel").textContent =
+    phase === "ready" ? "GET READY" :
+    phase === "work" ? "WORK" :
+    phase === "rest" ? "RECOVER" : "DONE";
+  $("roundLabel").textContent = phase === "done" ? "Workout complete" : "Round " + round + " of " + rounds;
+}
+function render() {
+  $("clock").textContent = fmt(remaining);
+  $("barFill").style.width = (100 * (1 - remaining / phaseTotal)) + "%";
+  $("elapsedLine").textContent = "Elapsed " + fmt(elapsedMs + (paused ? 0 : (Date.now() - elapsedBase)));
+}
+function setPhase(p, ms) {
+  phase = p; phaseTotal = ms; remaining = ms;
+  endAt = Date.now() + ms; lastTickSec = -1;
+  showPhase();
+}
+function advance() {
+  if (phase === "ready") { setPhase("work", workSec * 1000); workSound(); return; }
+  if (phase === "work") {
+    if (round >= rounds) { finish(); return; }
+    if (restSec > 0) { setPhase("rest", restSec * 1000); restSound(); }
+    else { round++; setPhase("work", workSec * 1000); workSound(); }
+    return;
+  }
+  if (phase === "rest") { round++; setPhase("work", workSec * 1000); workSound(); }
+}
+function finish() {
+  clearInterval(timerId); timerId = null; running = false; paused = false;
+  phase = "done"; remaining = 0; showPhase(); render();
+  music.pause(); music.currentTime = 0;
+  if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
+  finishSound();
+  $("pauseBtn").textContent = "Pause";
+}
+function tickFn() {
+  var now = Date.now();
+  remaining = endAt - now;
+  elapsedMs = elapsedMs; // elapsed tracked via elapsedBase below
+  if (remaining <= 0) { advance(); return; }
+  var s = Math.ceil(remaining / 1000);
+  if (s <= 3 && s !== lastTickSec) { lastTickSec = s; tick(); }
+  render();
+}
+function startTimer() {
+  updateTotal();
+  $("setupView").style.display = "none";
+  $("timerView").style.display = "block";
+  $("musicSelect2").value = $("musicSelect").value;
+  ctx(); // unlock audio on the tap
+  running = true; paused = false; round = 1; elapsedMs = 0; elapsedBase = Date.now();
+  setPhase("ready", 5000);
+  timerId = setInterval(tickFn, 100);
+  requestWake();
+  applyMusic();
+  $("pauseBtn").textContent = "Pause";
+  render();
+}
+function pauseToggle() {
+  if (!running) return;
+  if (!paused) {
+    clearInterval(timerId); timerId = null; paused = true;
+    elapsedMs += Date.now() - elapsedBase;
+    music.pause();
+    $("pauseBtn").textContent = "Resume";
+  } else {
+    paused = false;
+    endAt = Date.now() + remaining;
+    elapsedBase = Date.now();
+    timerId = setInterval(tickFn, 100);
+    requestWake();
+    applyMusic();
+    $("pauseBtn").textContent = "Pause";
+  }
+  render();
+}
+$("startBtn").addEventListener("click", startTimer);
+$("pauseBtn").addEventListener("click", pauseToggle);
+$("skipBtn").addEventListener("click", function () { if (running && !paused) advance(); });
+$("restartBtn").addEventListener("click", function () {
+  clearInterval(timerId);
+  running = true; paused = false; round = 1; elapsedMs = 0; elapsedBase = Date.now();
+  setPhase("ready", 5000);
+  timerId = setInterval(tickFn, 100);
+  applyMusic();
+  $("pauseBtn").textContent = "Pause";
+});
+$("endBtn").addEventListener("click", function () {
+  clearInterval(timerId); timerId = null; running = false; paused = false;
+  music.pause(); music.currentTime = 0;
+  if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
+  $("timerView").style.display = "none";
+  $("setupView").style.display = "block";
+});
+</script>
+</body>
+</html>
