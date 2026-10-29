@@ -8,9 +8,10 @@ A simple interval training timer for personal use. Open the GitHub Pages URL on 
 - 5-second get-ready countdown
 - Large color-coded display: green for work, blue for recovery, amber for get-ready
 - Ticker sounds: countdown ticks, phase-change tones, and a finish fanfare (all synthesized in the browser, no audio files)
+- Voice cues: the phone says "Go" at the start of every work interval, "Rest" at the start of every rest, and "Workout complete" at the end, so you can train without looking at the screen (built-in speech, no audio files)
 - Pause, restart, and skip controls
 - Screen stays awake while the timer runs (Wake Lock API, where supported)
-- Free workout music selection that plays during the session and stops when the workout ends
+- Free workout music selection that plays during the session and stops when the workout ends; rest periods automatically switch to a relaxing track, and the high-intensity track picks back up at the next work interval
 
 ## Music credits
 
@@ -20,6 +21,7 @@ All four tracks are by Kevin MacLeod (incompetech.com), licensed under CC BY 4.0
 - Run Amok
 - Volatile Reaction
 - Machinations
+- Meditation Impromptu 01 (the automatic rest-period track)
 
 ## Run locally
 

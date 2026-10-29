@@ -97,12 +97,13 @@
           <option value="music/volatile-reaction.mp3">Volatile Reaction</option>
           <option value="music/machinations.mp3">Machinations</option>
         </select>
+        <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">Rest periods switch to a relaxing track automatically.</p>
       </div>
       <div style="margin-top:12px">
         <label for="volInput" style="font-size:13px;color:#9ca3af">Music volume</label>
         <input id="volInput" type="range" min="0" max="100" value="70">
       </div>
-      <label class="check"><input id="soundToggle" type="checkbox" checked> Timer sounds on</label>
+      <label class="check"><input id="soundToggle" type="checkbox" checked> Timer sounds and voice on</label>
     </div>
 
     <button class="big-btn" id="startBtn">START</button>
@@ -139,7 +140,8 @@
   </div>
 
 </div>
-<audio id="music" loop preload="none"></audio>
+<audio id="musicWork" loop preload="none"></audio>
+<audio id="musicRest" loop preload="none"></audio>
 
 <script>
 "use strict";
@@ -169,6 +171,18 @@ function goSound() { beep(990, 0.12); beep(1320, 0.25, 0.14); }
 function workSound() { beep(660, 0.12); beep(990, 0.2, 0.14); }
 function restSound() { beep(440, 0.22); }
 function finishSound() { beep(523, 0.16); beep(659, 0.16, 0.18); beep(784, 0.3, 0.36); }
+
+// ---------- Voice cues (built-in speech, no files needed) ----------
+function speak(text) {
+  if (!$("soundToggle").checked) return;
+  if (!("speechSynthesis" in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    var u = new SpeechSynthesisUtterance(text);
+    u.rate = 1;
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
+}
 
 // ---------- Wake lock (screen stays awake) ----------
 var wakeLock = null;
@@ -212,20 +226,35 @@ document.querySelectorAll("[data-preset]").forEach(function (b) {
 });
 updateTotal();
 
-// ---------- Music ----------
-var music = $("music");
-music.volume = 0.7;
-$("volInput").addEventListener("input", function () { music.volume = $("volInput").value / 100; });
+// ---------- Music: workout track for work, relaxing track for rest ----------
+var workAudio = $("musicWork"), restAudio = $("musicRest");
+restAudio.src = "music/meditation-impromptu-01.mp3";
+workAudio.volume = 0.7; restAudio.volume = 0.7;
+$("volInput").addEventListener("input", function () {
+  workAudio.volume = $("volInput").value / 100;
+  restAudio.volume = $("volInput").value / 100;
+});
 function syncMusicSelects(from) {
   var other = from === "musicSelect" ? $("musicSelect2") : $("musicSelect");
   other.value = $(from).value;
   applyMusic();
 }
+function activeAudio() { return phase === "rest" ? restAudio : workAudio; }
+function stopMusic() {
+  workAudio.pause(); restAudio.pause();
+  workAudio.currentTime = 0; restAudio.currentTime = 0;
+}
 function applyMusic() {
   var src = $("musicSelect").value;
-  if (!src) { music.pause(); return; }
-  if (music.getAttribute("src") !== src) { music.src = src; }
-  if (running && !paused) { music.play().catch(function () {}); }
+  if (!src) { workAudio.pause(); restAudio.pause(); return; }
+  if (workAudio.getAttribute("src") !== src) { workAudio.src = src; }
+  if (running && !paused) {
+    var a = activeAudio(), other = a === workAudio ? restAudio : workAudio;
+    other.pause();
+    a.play().catch(function () {});
+  } else {
+    workAudio.pause(); restAudio.pause();
+  }
 }
 $("musicSelect").addEventListener("change", function () { syncMusicSelects("musicSelect"); });
 $("musicSelect2").addEventListener("change", function () { syncMusicSelects("musicSelect2"); });
@@ -251,27 +280,26 @@ function setPhase(p, ms) {
   showPhase();
 }
 function advance() {
-  if (phase === "ready") { setPhase("work", workSec * 1000); workSound(); return; }
+  if (phase === "ready") { setPhase("work", workSec * 1000); workSound(); speak("Go"); applyMusic(); return; }
   if (phase === "work") {
     if (round >= rounds) { finish(); return; }
-    if (restSec > 0) { setPhase("rest", restSec * 1000); restSound(); }
-    else { round++; setPhase("work", workSec * 1000); workSound(); }
+    if (restSec > 0) { setPhase("rest", restSec * 1000); restSound(); speak("Rest"); applyMusic(); }
+    else { round++; setPhase("work", workSec * 1000); workSound(); speak("Go"); }
     return;
   }
-  if (phase === "rest") { round++; setPhase("work", workSec * 1000); workSound(); }
+  if (phase === "rest") { round++; setPhase("work", workSec * 1000); workSound(); speak("Go"); applyMusic(); }
 }
 function finish() {
   clearInterval(timerId); timerId = null; running = false; paused = false;
   phase = "done"; remaining = 0; showPhase(); render();
-  music.pause(); music.currentTime = 0;
+  stopMusic();
   if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
-  finishSound();
+  finishSound(); speak("Workout complete");
   $("pauseBtn").textContent = "Pause";
 }
 function tickFn() {
   var now = Date.now();
   remaining = endAt - now;
-  elapsedMs = elapsedMs; // elapsed tracked via elapsedBase below
   if (remaining <= 0) { advance(); return; }
   var s = Math.ceil(remaining / 1000);
   if (s <= 3 && s !== lastTickSec) { lastTickSec = s; tick(); }
@@ -283,6 +311,7 @@ function startTimer() {
   $("timerView").style.display = "block";
   $("musicSelect2").value = $("musicSelect").value;
   ctx(); // unlock audio on the tap
+  speak("Get ready"); // also unlocks voice output on iOS for later cues
   running = true; paused = false; round = 1; elapsedMs = 0; elapsedBase = Date.now();
   setPhase("ready", 5000);
   timerId = setInterval(tickFn, 100);
@@ -296,7 +325,7 @@ function pauseToggle() {
   if (!paused) {
     clearInterval(timerId); timerId = null; paused = true;
     elapsedMs += Date.now() - elapsedBase;
-    music.pause();
+    workAudio.pause(); restAudio.pause();
     $("pauseBtn").textContent = "Resume";
   } else {
     paused = false;
@@ -322,7 +351,7 @@ $("restartBtn").addEventListener("click", function () {
 });
 $("endBtn").addEventListener("click", function () {
   clearInterval(timerId); timerId = null; running = false; paused = false;
-  music.pause(); music.currentTime = 0;
+  stopMusic();
   if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
   $("timerView").style.display = "none";
   $("setupView").style.display = "block";
