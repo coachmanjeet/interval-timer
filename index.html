@@ -116,7 +116,7 @@
     </div>
 
     <button class="big-btn" id="startBtn">START</button>
-    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).</p>
+    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v3: pre-recorded voice cues</p>
   </div>
 
   <!-- TIMER -->
@@ -158,6 +158,10 @@
 </div>
 <audio id="musicWork" loop preload="none"></audio>
 <audio id="musicRest" loop preload="none"></audio>
+<audio id="cueReady" preload="auto" src="voice/get-ready.mp3"></audio>
+<audio id="cueGo" preload="auto" src="voice/go.mp3"></audio>
+<audio id="cueRest" preload="auto" src="voice/rest.mp3"></audio>
+<audio id="cueDone" preload="auto" src="voice/complete.mp3"></audio>
 
 <script>
 "use strict";
@@ -222,8 +226,37 @@ function unlockAudio() {
     src.buffer = buf; src.connect(c.destination); src.start();
   } catch (e) {}
 }
+// Voice cues: pre-recorded files first, live speech as fallback.
+// iOS Safari silently drops speechSynthesis outside tap handlers, and can
+// drop it entirely on some phones, while laptop browsers play it fine. The
+// recorded files play through the same <audio> path as music, which iOS
+// allows from timer callbacks once primed in a tap.
+var cueEls = null;
+function cueMap() {
+  if (!cueEls) {
+    cueEls = {
+      "Get ready": $("cueReady"),
+      "Go": $("cueGo"),
+      "Rest": $("cueRest"),
+      "Workout complete": $("cueDone")
+    };
+  }
+  return cueEls;
+}
 function speak(text) {
   if (!$("soundToggle").checked) return;
+  var a = cueMap()[text];
+  if (a) {
+    try {
+      a.currentTime = 0;
+      var p = a.play();
+      if (p && p.then) { p.then(function () {}, function () { speakTTS(text); }); }
+      return;
+    } catch (e) {}
+  }
+  speakTTS(text);
+}
+function speakTTS(text) {
   if (!("speechSynthesis" in window)) return;
   var synth = window.speechSynthesis;
   function say() {
@@ -321,7 +354,7 @@ function unlockMusic() {
   // Prime both audio elements inside the tap (muted) so later play()
   // calls from the timer are allowed on iOS.
   applyMusic();
-  [workAudio, restAudio].forEach(function (a) {
+  [workAudio, restAudio, $("cueReady"), $("cueGo"), $("cueRest"), $("cueDone")].forEach(function (a) {
     if (!a.getAttribute("src")) return;
     try {
       var v = a.volume; a.volume = 0;
