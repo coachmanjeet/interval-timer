@@ -12,8 +12,8 @@
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #111827; color: #fff; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #111827; color: #fff; -webkit-text-size-adjust: 100%; }
   .wrap { max-width: 480px; margin: 0 auto; padding: 20px 16px 40px; }
   h1 { text-align: center; font-size: 28px; margin: 8px 0 4px; }
   .sub { text-align: center; color: #9ca3af; margin: 0 0 20px; font-size: 14px; }
@@ -39,7 +39,7 @@
   .phase.rest { background: #2563eb; }
   .phase.done { background: #6d28d9; }
   .phase-label { font-size: 30px; font-weight: 800; letter-spacing: 2px; }
-  .clock { font-size: 96px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .clock { font-size: clamp(64px, 22vw, 96px); font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .round { font-size: 20px; margin-top: 6px; }
   .bar { height: 12px; background: rgba(255,255,255,0.3); border-radius: 6px; margin-top: 16px; overflow: hidden; }
   .bar > div { height: 100%; background: #fff; width: 0%; }
@@ -111,6 +111,8 @@
         <input id="volInput" type="range" min="0" max="100" value="70">
       </div>
       <label class="check"><input id="soundToggle" type="checkbox" checked> Timer sounds and voice on</label>
+      <button class="big-btn" id="testSoundBtn" style="margin-top:10px;background:#374151;font-size:17px;padding:14px">Test sound</button>
+      <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">Tap this first on your phone. You should hear a tick, then the voice say "Go". If you hear nothing, check the silent switch and volume.</p>
     </div>
 
     <button class="big-btn" id="startBtn">START</button>
@@ -187,14 +189,55 @@ function restSound() { beep(440, 0.22); }
 function finishSound() { beep(523, 0.16); beep(659, 0.16, 0.18); beep(784, 0.3, 0.36); }
 
 // ---------- Voice cues (built-in speech, no files needed) ----------
+// iOS Safari drops the first utterance if voices have not loaded yet, and
+// can swallow a speak() issued right after cancel(). So: preload voices,
+// pick one, and only cancel-then-speak (with a small delay) when something
+// is actually speaking.
+var pickedVoice = null;
+function loadVoices() {
+  try {
+    var vs = window.speechSynthesis.getVoices();
+    if (vs && vs.length) {
+      pickedVoice = null;
+      for (var i = 0; i < vs.length; i++) {
+        if (/en[-_]US/i.test(vs[i].lang)) { pickedVoice = vs[i]; break; }
+      }
+      if (!pickedVoice) { pickedVoice = vs[0]; }
+    }
+  } catch (e) {}
+}
+if ("speechSynthesis" in window) {
+  loadVoices();
+  if ("onvoiceschanged" in window.speechSynthesis) {
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }
+}
+function unlockAudio() {
+  // Call inside a tap: opens the audio session on iOS so later timer
+  // sounds and music are allowed to play.
+  var c = ctx(); if (!c) return;
+  try {
+    var buf = c.createBuffer(1, 1, 22050);
+    var src = c.createBufferSource();
+    src.buffer = buf; src.connect(c.destination); src.start();
+  } catch (e) {}
+}
 function speak(text) {
   if (!$("soundToggle").checked) return;
   if (!("speechSynthesis" in window)) return;
+  var synth = window.speechSynthesis;
+  function say() {
+    try {
+      if (synth.paused) { synth.resume(); }
+      var u = new SpeechSynthesisUtterance(text);
+      if (pickedVoice) { u.voice = pickedVoice; }
+      u.rate = 1;
+      synth.speak(u);
+    } catch (e) {}
+  }
   try {
-    window.speechSynthesis.cancel();
-    var u = new SpeechSynthesisUtterance(text);
-    u.rate = 1;
-    window.speechSynthesis.speak(u);
+    if (synth.speaking || synth.pending) { synth.cancel(); setTimeout(say, 120); }
+    else { say(); }
   } catch (e) {}
 }
 
@@ -205,7 +248,7 @@ function requestWake() {
   navigator.wakeLock.request("screen").then(function (l) { wakeLock = l; }).catch(function () {});
 }
 document.addEventListener("visibilitychange", function () {
-  if (document.visibilityState === "visible" && running && !paused) requestWake();
+  if (document.visibilityState === "visible" && running && !paused) { requestWake(); unlockAudio(); }
 });
 
 // ---------- Timer state ----------
@@ -274,6 +317,20 @@ function applyMusic() {
   if (running && !paused) { a.play().catch(function () {}); }
   else { a.pause(); }
 }
+function unlockMusic() {
+  // Prime both audio elements inside the tap (muted) so later play()
+  // calls from the timer are allowed on iOS.
+  applyMusic();
+  [workAudio, restAudio].forEach(function (a) {
+    if (!a.getAttribute("src")) return;
+    try {
+      var v = a.volume; a.volume = 0;
+      var p = a.play();
+      if (p && p.then) { p.then(function () { a.pause(); a.volume = v; }).catch(function () { a.volume = v; }); }
+      else { a.volume = v; }
+    } catch (e) {}
+  });
+}
 $("musicSelect").addEventListener("change", syncPair("musicSelect", "musicSelect2"));
 $("musicSelect2").addEventListener("change", syncPair("musicSelect2", "musicSelect"));
 $("musicRestSelect").addEventListener("change", syncPair("musicRestSelect", "musicRestSelect2"));
@@ -322,7 +379,15 @@ function tickFn() {
   remaining = endAt - now;
   if (remaining <= 0) { advance(); return; }
   var s = Math.ceil(remaining / 1000);
-  if (s <= 3 && s !== lastTickSec) { lastTickSec = s; tick(); }
+  if (s !== lastTickSec) {
+    lastTickSec = s;
+    // Get-ready ticks every second (5, 4, 3, 2, 1); work/rest keep the
+    // last-3-seconds countdown ticks.
+    if (phase === "ready" || s <= 3) { tick(); }
+  }
+  if ("speechSynthesis" in window) {
+    try { if (window.speechSynthesis.paused) { window.speechSynthesis.resume(); } } catch (e) {}
+  }
   render();
 }
 function startTimer() {
@@ -331,7 +396,8 @@ function startTimer() {
   $("timerView").style.display = "block";
   $("musicSelect2").value = $("musicSelect").value;
   $("musicRestSelect2").value = $("musicRestSelect").value;
-  ctx(); // unlock audio on the tap
+  unlockAudio(); // unlock audio on the tap
+  unlockMusic(); // prime music elements so later play() calls are allowed on iOS
   speak("Get ready"); // also unlocks voice output on iOS for later cues
   running = true; paused = false; round = 1; elapsedMs = 0; elapsedBase = Date.now();
   setPhase("ready", 5000);
@@ -354,11 +420,18 @@ function pauseToggle() {
     elapsedBase = Date.now();
     timerId = setInterval(tickFn, 100);
     requestWake();
+    unlockAudio();
     applyMusic();
     $("pauseBtn").textContent = "Pause";
   }
   render();
 }
+$("testSoundBtn").addEventListener("click", function () {
+  unlockAudio();
+  unlockMusic();
+  tick();
+  setTimeout(function () { speak("Go"); }, 300);
+});
 $("startBtn").addEventListener("click", startTimer);
 $("pauseBtn").addEventListener("click", pauseToggle);
 $("skipBtn").addEventListener("click", function () { if (running && !paused) advance(); });
@@ -367,6 +440,8 @@ $("restartBtn").addEventListener("click", function () {
   running = true; paused = false; round = 1; elapsedMs = 0; elapsedBase = Date.now();
   setPhase("ready", 5000);
   timerId = setInterval(tickFn, 100);
+  unlockAudio();
+  speak("Get ready");
   applyMusic();
   $("pauseBtn").textContent = "Pause";
 });
