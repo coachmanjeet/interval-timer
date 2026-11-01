@@ -187,7 +187,7 @@
       <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">Tap this first on your phone. You should hear a tick, then the voice say "Go". If you hear nothing, check the silent switch and volume.</p>
     </details>
 
-    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v12: flexible circuit work/rest like the Timer tab</p>
+    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v13: music gap after cues cut to 1 second</p>
   </div>
 
   <!-- TIMER -->
@@ -582,7 +582,7 @@ function stopMusic() {
   workAudio.pause(); restAudio.pause();
   workAudio.currentTime = 0; restAudio.currentTime = 0;
 }
-// Music starts 2 seconds after a phase change, so the Go, Rest, and
+// Music starts 1 second after a phase change, so the Go, Rest, and
 // Round rest cues are heard clearly before the track comes in. Resume
 // and mid-workout track changes play at once: only phase changes set
 // the delay, and applyMusic re-checks everything when a delayed start
@@ -687,7 +687,7 @@ function enterPhase(i) {
   if (p.type === "rest") { restSound(); speak("Rest"); }
   if (p.type === "roundrest") { restSound(); speak("Round rest"); }
   if (p.type === "work" || p.type === "rest" || p.type === "roundrest") {
-    musicDelayUntil = Date.now() + 2000;
+    musicDelayUntil = Date.now() + 1000;
   }
   applyMusic();
   updateFigure();
