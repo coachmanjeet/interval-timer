@@ -140,7 +140,17 @@
           </select>
         </div>
       </div>
-      <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">First time? Try 1 round. 60 seconds rest between rounds. Tap a routine to start it. The timer names each station and shows what comes next.</p>
+      <div class="row">
+        <div class="field">
+          <label for="circuitWorkInput">Work (sec)</label>
+          <input id="circuitWorkInput" type="number" inputmode="numeric" min="5" max="600" value="40">
+        </div>
+        <div class="field">
+          <label for="circuitRestInput">Rest (sec)</label>
+          <input id="circuitRestInput" type="number" inputmode="numeric" min="0" max="600" value="20">
+        </div>
+      </div>
+      <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">First time? Try 1 round. Work and rest apply to every station. 60 seconds rest between rounds. Tap a routine to start it. The timer names each station and shows what comes next.</p>
     </div>
 
     <div class="card">
@@ -177,7 +187,7 @@
       <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">Tap this first on your phone. You should hear a tick, then the voice say "Go". If you hear nothing, check the silent switch and volume.</p>
     </details>
 
-    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v11: leaner circuit cards, station lists only</p>
+    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v12: flexible circuit work/rest like the Timer tab</p>
   </div>
 
   <!-- TIMER -->
@@ -482,12 +492,16 @@ function buildClassicPhases() {
 function buildCircuitPhases(routine, nRounds) {
   var list = [{ type: "ready", ms: getReadySec("circuit") * 1000, round: 1 }];
   var stations = routine.stations;
+  // Flexible like the Timer tab: one work time and one rest time for
+  // every station, clamped the same way (work 5-600, rest 0-600).
+  var workSec = Math.min(600, Math.max(5, parseInt($("circuitWorkInput").value, 10) || 40));
+  var restSec = Math.min(600, Math.max(0, parseInt($("circuitRestInput").value, 10) || 0));
   for (var r = 1; r <= nRounds; r++) {
     for (var i = 0; i < stations.length; i++) {
       var st = stations[i];
-      list.push({ type: "work", ms: st.work * 1000, round: r, station: st.name, stationIdx: i + 1, stationCount: stations.length });
-      if (i < stations.length - 1 && st.rest > 0) {
-        list.push({ type: "rest", ms: st.rest * 1000, round: r, station: st.name, stationIdx: i + 1, stationCount: stations.length });
+      list.push({ type: "work", ms: workSec * 1000, round: r, station: st.name, stationIdx: i + 1, stationCount: stations.length });
+      if (i < stations.length - 1 && restSec > 0) {
+        list.push({ type: "rest", ms: restSec * 1000, round: r, station: st.name, stationIdx: i + 1, stationCount: stations.length });
       }
     }
     if (r < nRounds && routine.roundRest > 0) {
@@ -852,6 +866,8 @@ function renderRoutineButtons() {
   });
 }
 $("circuitRoundsInput").addEventListener("input", function () { renderRoutineButtons(); saveSettings(); });
+$("circuitWorkInput").addEventListener("input", saveSettings);
+$("circuitRestInput").addEventListener("input", saveSettings);
 
 // ---------- Remember settings across visits (local only, no account) ----------
 function storeGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
@@ -860,6 +876,7 @@ function saveSettings() {
   var s = {
     work: $("workInput").value, rest: $("restInput").value, rounds: $("roundsInput").value,
     circuitRounds: $("circuitRoundsInput").value,
+    circuitWork: $("circuitWorkInput").value, circuitRest: $("circuitRestInput").value,
     timerGetReady: $("timerGetReady").value, circuitGetReady: $("circuitGetReady").value,
     music: $("musicSelect").value, restMusic: $("musicRestSelect").value,
     vol: $("volInput").value, sound: $("soundToggle").checked ? "1" : "0",
@@ -877,6 +894,8 @@ function loadSettings() {
   if (s.rest) $("restInput").value = s.rest;
   if (s.rounds) $("roundsInput").value = s.rounds;
   if (s.circuitRounds) $("circuitRoundsInput").value = s.circuitRounds;
+  if (s.circuitWork) $("circuitWorkInput").value = s.circuitWork;
+  if (s.circuitRest) $("circuitRestInput").value = s.circuitRest;
   if (s.timerGetReady) $("timerGetReady").value = s.timerGetReady;
   if (s.circuitGetReady) $("circuitGetReady").value = s.circuitGetReady;
   if (s.music !== undefined) $("musicSelect").value = s.music;
