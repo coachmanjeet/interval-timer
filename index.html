@@ -66,6 +66,7 @@
   .routines button:active { background: #4b5563; }
   .r-name { font-size: 18px; font-weight: 700; }
   .r-sum { font-size: 13px; color: #9ca3af; margin-top: 4px; }
+  .r-seq { font-size: 13px; color: #d1d5db; margin-top: 4px; }
   .phase-label.station { font-size: 24px; letter-spacing: 1px; }
   .next { font-size: 16px; color: #d1d5db; margin-top: 4px; }
 </style>
@@ -165,7 +166,7 @@
           <option value="music/the-parting.mp3">The Parting</option>
           <option value="music/meditation-impromptu-01.mp3">Meditation Impromptu (calm piano)</option>
         </select>
-        <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">Music starts at Go, not during get-ready. Rest periods switch to your rest pick automatically.</p>
+        <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">Music starts at Go, not during get-ready. Rest periods switch to your rest pick automatically. These picks apply to both Timer and Circuits.</p>
       </div>
       <div style="margin-top:12px">
         <label for="volInput" style="font-size:13px;color:#9ca3af">Music volume</label>
@@ -176,7 +177,7 @@
       <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">Tap this first on your phone. You should hear a tick, then the voice say "Go". If you hear nothing, check the silent switch and volume.</p>
     </details>
 
-    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v9: silent start, steady voice, preset selection</p>
+    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v10: music waits for the cue, circuit sequences listed</p>
   </div>
 
   <!-- TIMER -->
@@ -567,6 +568,13 @@ function stopMusic() {
   workAudio.pause(); restAudio.pause();
   workAudio.currentTime = 0; restAudio.currentTime = 0;
 }
+// Music starts 2 seconds after a phase change, so the Go, Rest, and
+// Round rest cues are heard clearly before the track comes in. Resume
+// and mid-workout track changes play at once: only phase changes set
+// the delay, and applyMusic re-checks everything when a delayed start
+// fires, so a skip, pause, or end inside the window never starts stale
+// music.
+var musicDelayUntil = 0, musicTimer = null;
 function applyMusic() {
   var workSrc = $("musicSelect").value;
   var restSrc = $("musicRestSelect").value;
@@ -581,8 +589,16 @@ function applyMusic() {
   // silently killed rest music too.
   var src = a === workAudio ? workSrc : restSrc;
   if (!src) { a.pause(); return; }
-  if (running && !paused) { a.play().catch(function () {}); }
-  else { a.pause(); }
+  if (!running || paused) { a.pause(); return; }
+  if (!a.paused) return; // already playing this track (back-to-back work)
+  var wait = musicDelayUntil - Date.now();
+  if (wait > 0) {
+    if (!musicTimer) {
+      musicTimer = setTimeout(function () { musicTimer = null; applyMusic(); }, wait);
+    }
+    return;
+  }
+  a.play().catch(function () {});
 }
 function unlockMusic() {
   // Set the music sources and warm the cue files, silently. The old code
@@ -656,6 +672,9 @@ function enterPhase(i) {
   if (p.type === "work") { workSound(); if (currentStation) speakStation(currentStation); else speak("Go"); }
   if (p.type === "rest") { restSound(); speak("Rest"); }
   if (p.type === "roundrest") { restSound(); speak("Round rest"); }
+  if (p.type === "work" || p.type === "rest" || p.type === "roundrest") {
+    musicDelayUntil = Date.now() + 2000;
+  }
   applyMusic();
   updateFigure();
 }
@@ -841,7 +860,9 @@ function renderRoutineButtons() {
       nRounds + " rounds · about " + Math.round(routineTotalSec(r, nRounds) / 60) + " min" +
       (r.equipment ? " · " + r.equipment : "");
     if (r.name === "Full-Body Starter") { sum.textContent = "Start here · " + sum.textContent; }
-    b.appendChild(name); b.appendChild(sum);
+    var seq = document.createElement("div"); seq.className = "r-seq";
+    seq.textContent = r.stations.map(function (s) { return s.name; }).join(" · ");
+    b.appendChild(name); b.appendChild(sum); b.appendChild(seq);
     b.addEventListener("click", function () { startCircuit(idx); });
     list.appendChild(b);
   });
