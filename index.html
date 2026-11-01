@@ -65,8 +65,8 @@
   .routines button:last-child { margin-bottom: 0; }
   .routines button:active { background: #4b5563; }
   .r-name { font-size: 18px; font-weight: 700; }
-  .r-sum { font-size: 13px; color: #9ca3af; margin-top: 4px; }
-  .r-seq { font-size: 13px; color: #d1d5db; margin-top: 4px; }
+  .r-badge { font-size: 11px; font-weight: 600; color: #fff; background: #22c55e; padding: 2px 8px; border-radius: 999px; margin-left: 8px; vertical-align: middle; }
+  .r-seq { font-size: 14px; color: #d1d5db; margin-top: 6px; }
   .phase-label.station { font-size: 24px; letter-spacing: 1px; }
   .next { font-size: 16px; color: #d1d5db; margin-top: 4px; }
 </style>
@@ -177,7 +177,7 @@
       <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">Tap this first on your phone. You should hear a tick, then the voice say "Go". If you hear nothing, check the silent switch and volume.</p>
     </details>
 
-    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v10: music waits for the cue, circuit sequences listed</p>
+    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v11: leaner circuit cards, station lists only</p>
   </div>
 
   <!-- TIMER -->
@@ -834,35 +834,19 @@ function showTab(which) {
 }
 $("tabTimerBtn").addEventListener("click", function () { showTab("timer"); });
 $("tabCircuitBtn").addEventListener("click", function () { showTab("circuits"); });
-function routineTotalSec(routine, nRounds) {
-  var perRound = 0;
-  routine.stations.forEach(function (s, i) {
-    perRound += s.work;
-    if (i < routine.stations.length - 1) perRound += s.rest;
-  });
-  return getReadySec("circuit") + nRounds * perRound + (nRounds - 1) * routine.roundRest;
-}
 function renderRoutineButtons() {
-  var nRounds = Math.min(10, Math.max(1, parseInt($("circuitRoundsInput").value, 10) || 3));
   var list = $("routineList");
   list.innerHTML = "";
   ROUTINES.forEach(function (r, idx) {
-    var minWork = Math.min.apply(null, r.stations.map(function (s) { return s.work; }));
-    var maxWork = Math.max.apply(null, r.stations.map(function (s) { return s.work; }));
-    var workRange = minWork === maxWork ? minWork + "s" : minWork + "-" + maxWork + "s";
-    var minRest = Math.min.apply(null, r.stations.map(function (s) { return s.rest; }));
-    var maxRest = Math.max.apply(null, r.stations.map(function (s) { return s.rest; }));
-    var restRange = minRest === maxRest ? minRest + "s" : minRest + "-" + maxRest + "s";
     var b = document.createElement("button");
     var name = document.createElement("div"); name.className = "r-name"; name.textContent = r.name;
-    var sum = document.createElement("div"); sum.className = "r-sum";
-    sum.textContent = r.stations.length + " stations · " + workRange + " work / " + restRange + " rest · " +
-      nRounds + " rounds · about " + Math.round(routineTotalSec(r, nRounds) / 60) + " min" +
-      (r.equipment ? " · " + r.equipment : "");
-    if (r.name === "Full-Body Starter") { sum.textContent = "Start here · " + sum.textContent; }
+    if (r.name === "Full-Body Starter") {
+      var badge = document.createElement("span"); badge.className = "r-badge"; badge.textContent = "Start here";
+      name.appendChild(badge);
+    }
     var seq = document.createElement("div"); seq.className = "r-seq";
     seq.textContent = r.stations.map(function (s) { return s.name; }).join(" · ");
-    b.appendChild(name); b.appendChild(sum); b.appendChild(seq);
+    b.appendChild(name); b.appendChild(seq);
     b.addEventListener("click", function () { startCircuit(idx); });
     list.appendChild(b);
   });
