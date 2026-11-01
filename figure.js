@@ -1,11 +1,12 @@
-// figure.js — animated exercise figure for the interval timer circuits.
+// figure.js — animated human demo figure for the interval timer circuits.
 //
-// A stylized side-view pictogram figure, drawn with SVG lines, so a
-// beginner can follow the movement without a video. Each movement pattern
-// is a function of time returning joint positions; legs use 2-bone IK so
-// knees bend plausibly. Jumping jacks use a separate front-view figure.
-// The app drives it from the timer phases: work shows the current station,
-// rest shows the next station dimmed, get-ready shows the first station.
+// A human-shaped demo (filled two-tone body, skin-tone head with hair,
+// hands and feet), drawn with SVG lines, so a beginner can follow the
+// movement without a video. Each movement pattern is a function of time
+// returning joint positions; legs use 2-bone IK so knees bend plausibly.
+// Jumping jacks use a separate front-view figure. The app drives it from
+// the timer phases: work shows the current station, rest shows the next
+// station dimmed, get-ready shows the first station.
 //
 // No dependency on the timer page: createExerciseFigure(container) builds
 // its own SVG. renderOne(pattern, t, opts) draws a single static frame,
@@ -36,14 +37,16 @@
 
   // Each pattern returns { side: joints } or { front: {...} } plus an
   // optional flip (mirror) and weight point. Joints: hip, shoulder, head,
-  // ankleF/KneeF/elbowF/wristF (front limbs), ankleB/kneeB/elbowB/wristB.
+  // ankleF/kneeF/elbowF/wristF (front limbs), ankleB/kneeB/elbowB/wristB.
+  // Rep cadence is deliberately quick (about 1.5s) so the motion reads
+  // at a glance instead of dwelling at the extremes.
   var PATTERNS = {
     squat: function (t, weight) {
-      var depth = rep(t, 2.2);
-      var hip = pt(102 - 14 * depth, 96 + 44 * depth);
+      var depth = rep(t, 1.6);
+      var hip = pt(102 - 16 * depth, 96 + 52 * depth);
       var ankle = pt(108, 180);
       var shoulder = pt(hip.x + 4 + 12 * depth, hip.y - 48);
-      var wrist = pt(shoulder.x + 30, shoulder.y + 22);
+      var wrist = pt(shoulder.x + 36, shoulder.y + 22);
       return { side: {
         hip: hip, shoulder: shoulder, head: pt(shoulder.x + 2, shoulder.y - 18),
         ankleF: ankle, kneeF: ik(hip.x, hip.y, ankle.x, ankle.y, 46, 46, -1),
@@ -53,9 +56,9 @@
         weight: weight === "chest" ? pt(shoulder.x + 14, shoulder.y + 8) : null } };
     },
     lunge: function (t) {
-      var depth = rep(t, 2.6);
-      var flip = Math.floor(t / 2.6) % 2 === 1;
-      var hip = pt(104 + 6 * depth, 96 + 32 * depth);
+      var depth = rep(t, 1.8);
+      var flip = Math.floor(t / 1.8) % 2 === 1;
+      var hip = pt(104 + 6 * depth, 96 + 38 * depth);
       var ankleF = pt(142, 180), ankleB = pt(66, 180);
       var shoulder = pt(hip.x + 2, hip.y - 48);
       var wrist = pt(shoulder.x + 6, shoulder.y + 62);
@@ -68,10 +71,10 @@
         weight: null } };
     },
     pushup: function (t) {
-      var depth = rep(t, 2.0);
+      var depth = rep(t, 1.5);
       var ankle = pt(42, 174);
       var wrist = pt(152, 180);
-      var shoulder = pt(138 + 6 * depth, 128 + 26 * depth);
+      var shoulder = pt(138 + 6 * depth, 128 + 30 * depth);
       var hip = pt((ankle.x + shoulder.x) / 2, (ankle.y + shoulder.y) / 2 - 6);
       // Plank legs stay straight; the IK bend made them look frog-like.
       var knee = pt((hip.x + ankle.x) / 2, (hip.y + ankle.y) / 2);
@@ -84,7 +87,7 @@
         weight: null } };
     },
     plank: function (t) {
-      var bob = 2 * Math.sin(t * Math.PI * 2 * 0.25);
+      var bob = 3 * Math.sin(t * Math.PI * 2 * 0.33);
       var ankle = pt(42, 174);
       var wrist = pt(152, 180);
       var shoulder = pt(138, 128 + bob);
@@ -99,9 +102,9 @@
         weight: null } };
     },
     bridge: function (t) {
-      var depth = rep(t, 2.2);
+      var depth = rep(t, 1.6);
       var shoulder = pt(62, 168);
-      var hip = pt(108, 168 - 36 * depth);
+      var hip = pt(108, 168 - 42 * depth);
       var ankle = pt(152, 180);
       var wrist = pt(88, 176);
       return { side: {
@@ -113,11 +116,11 @@
         weight: null } };
     },
     jacks: function (t) {
-      var spread = rep(t, 1.1);
+      var spread = rep(t, 0.9);
       return { front: { spread: spread } };
     },
     deadbug: function (t) {
-      var swap = Math.floor(t / 2.4) % 2 === 1;
+      var swap = Math.floor(t / 1.8) % 2 === 1;
       var shoulder = pt(70, 168);
       var hip = pt(112, 168);
       // One leg extended, one in tabletop; they swap each rep.
@@ -137,7 +140,7 @@
     bicycle: function (t) {
       var shoulder = pt(70, 166 + 2 * Math.sin(t * Math.PI * 2 * 0.8));
       var hip = pt(110, 168);
-      var th1 = t * Math.PI * 2 / 1.2, th2 = th1 + Math.PI;
+      var th1 = t * Math.PI * 2 / 1.0, th2 = th1 + Math.PI;
       var ankleF = pt(118 + 28 * Math.cos(th1), 148 + 26 * Math.sin(th1));
       var ankleB = pt(118 + 28 * Math.cos(th2), 148 + 26 * Math.sin(th2));
       var wrist = pt(70, 112);
@@ -150,14 +153,13 @@
         weight: null } };
     },
     climbers: function (t) {
-      var drive = Math.floor(t / 0.6) % 2 === 1;
+      var drive = Math.floor(t / 0.5) % 2 === 1;
       var ankleBack = pt(42, 174);
       var wrist = pt(152, 180);
       var shoulder = pt(138, 128);
       var hip = pt((ankleBack.x + shoulder.x) / 2, (ankleBack.y + shoulder.y) / 2 - 6);
       // Drive foot lands under the chest with the knee forward; the back
-      // leg stays straight. The old drive target sat too close to the hip
-      // and folded the leg into a loop.
+      // leg stays straight.
       var ankleDrive = pt(118, 172);
       var ankleF = drive ? ankleDrive : ankleBack;
       var ankleB = drive ? ankleBack : ankleDrive;
@@ -171,14 +173,14 @@
         weight: null } };
     },
     sideplank: function (t) {
-      var pulse = 1.5 * Math.sin(t * Math.PI * 2 * 0.25);
+      var pulse = 2.5 * Math.sin(t * Math.PI * 2 * 0.33);
       var shoulder = pt(104, 138 + pulse);
       var hip = pt(78, 160 + pulse);
       var ankle = pt(48, 178 + pulse);
       var elbow = pt(100, 176);
       var wristTop = pt(104, 96 + pulse);
       // Front arm props the body: upper arm down to the elbow, forearm
-      // flat on the ground. The old version hid the forearm entirely.
+      // flat on the ground.
       var wristGround = pt(122, 176);
       return { side: {
         hip: hip, shoulder: shoulder, head: pt(108, 122 + pulse),
@@ -189,8 +191,8 @@
         weight: null } };
     },
     calf: function (t) {
-      var rise = rep(t, 1.2);
-      var lift = 10 * rise;
+      var rise = rep(t, 1.0);
+      var lift = 12 * rise;
       var ankle = pt(108, 180 - lift);
       var hip = pt(102, 96 - lift);
       var shoulder = pt(104, 50 - lift);
@@ -219,7 +221,7 @@
         weight: null } };
     },
     row: function (t, weight) {
-      var pull = rep(t, 2.0);
+      var pull = rep(t, 1.6);
       var hip = pt(88, 122);
       var ankle = pt(108, 180);
       var shoulder = pt(122, 86);
@@ -233,8 +235,8 @@
         weight: weight ? wrist : null } };
     },
     deadlift: function (t) {
-      var depth = rep(t, 2.4);
-      var hip = pt(102 - 16 * depth, 96 + 30 * depth);
+      var depth = rep(t, 1.8);
+      var hip = pt(102 - 20 * depth, 96 + 34 * depth);
       var ankle = pt(108, 180);
       var shoulder = pt(hip.x + 8 + 40 * depth, hip.y - 48 + 16 * depth);
       var wrist = pt(shoulder.x + 2, shoulder.y + 54);
@@ -247,7 +249,7 @@
         weight: null } };
     },
     press: function (t) {
-      var press = rep(t, 2.0);
+      var press = rep(t, 1.4);
       var hip = pt(102, 96);
       var ankle = pt(108, 180);
       var shoulder = pt(104, 50);
@@ -261,7 +263,7 @@
         weight: null } };
     },
     floorpress: function (t, weight) {
-      var press = rep(t, 2.0);
+      var press = rep(t, 1.6);
       var shoulder = pt(70, 168);
       var hip = pt(112, 168);
       var ankle = pt(152, 180);
@@ -276,7 +278,8 @@
     },
     farmerhold: function (t) {
       var sway = 2 * Math.sin(t * Math.PI * 2 * 0.5);
-      var hip = pt(102 + sway, 96);
+      var tremble = Math.sin(t * 25) * 0.8;
+      var hip = pt(102 + sway + tremble, 96);
       var ankle = pt(108 + sway, 180);
       var shoulder = pt(104 + sway, 50);
       var wrist = pt(106 + sway, 116);
@@ -313,13 +316,26 @@
     "Farmer Hold": { pattern: "farmerhold", weight: "wrists" }
   };
 
+  // Body colors: shirt, pants, skin, hair. Back limbs are darker shades
+  // so the near side reads in front.
+  var C = {
+    shirt: "#38bdf8", shirtDark: "#0284c7",
+    pants: "#cbd5e1", pantsDark: "#64748b",
+    skin: "#fcd9b8", hair: "#1f2937", weight: "#f59e0b"
+  };
+
   function line(el, a, b) {
     el.setAttribute("x1", a.x); el.setAttribute("y1", a.y);
     el.setAttribute("x2", b.x); el.setAttribute("y2", b.y);
   }
+  function dot(el, p) {
+    el.setAttribute("cx", p.x); el.setAttribute("cy", p.y);
+  }
   function createExerciseFigure(container) {
     var svg = document.createElementNS(SVGNS, "svg");
-    svg.setAttribute("viewBox", "0 0 220 200");
+    // Cropped viewBox zooms the figure about 1.4x versus the old
+    // full 220-wide frame. Mirror axis stays x=110 in user coords.
+    svg.setAttribute("viewBox", "30 0 160 195");
     svg.style.display = "block";
     svg.style.width = "100%";
     svg.style.height = "auto";
@@ -331,32 +347,47 @@
     function limb(color, width) {
       return el("line", { stroke: color, "stroke-width": width, "stroke-linecap": "round" });
     }
-    var ground = el("line", { x1: 8, y1: GROUND_Y, x2: 212, y2: GROUND_Y, stroke: "#374151", "stroke-width": 2 });
+    function skinDot(r) {
+      return el("circle", { r: r, fill: C.skin });
+    }
+    var shadow = el("ellipse", { cx: 110, cy: 186, rx: 36, ry: 4, fill: "#000000", opacity: 0.22 });
+    var ground = el("line", { x1: 30, y1: GROUND_Y, x2: 190, y2: GROUND_Y, stroke: "#374151", "stroke-width": 2 });
     var wall = el("line", { x1: 58, y1: 40, x2: 58, y2: GROUND_Y, stroke: "#4b5563", "stroke-width": 4 });
     wall.style.display = "none";
     var mirror = el("g", {});
-    var legB1 = limb("#6b7280", 7), legB2 = limb("#6b7280", 7);
-    var armB1 = limb("#6b7280", 6), armB2 = limb("#6b7280", 6);
-    var legF1 = limb("#ffffff", 9), legF2 = limb("#ffffff", 9);
-    var armF1 = limb("#ffffff", 8), armF2 = limb("#ffffff", 8);
-    var torso = limb("#ffffff", 11);
-    var head = el("circle", { r: 12, fill: "#ffffff" });
-    var weight = el("circle", { r: 8, fill: "#f59e0b" });
+    var legB1 = limb(C.pantsDark, 10), legB2 = limb(C.pantsDark, 10);
+    var armB1 = limb(C.shirtDark, 9), armB2 = limb(C.shirtDark, 9);
+    var legF1 = limb(C.pants, 13), legF2 = limb(C.pants, 13);
+    var torso = limb(C.shirt, 20);
+    var armF1 = limb(C.shirt, 11), armF2 = limb(C.shirt, 11);
+    var head = el("circle", { r: 14, fill: C.skin });
+    var hair = el("path", { d: "M -14 0 A 14 14 0 0 1 14 0 Z", fill: C.hair });
+    var handDot = skinDot(5), footDotF = skinDot(5), footDotB = skinDot(5);
+    var weight = el("circle", { r: 8, fill: C.weight });
     weight.style.display = "none";
     mirror.appendChild(legB1); mirror.appendChild(legB2);
     mirror.appendChild(armB1); mirror.appendChild(armB2);
     mirror.appendChild(legF1); mirror.appendChild(legF2);
+    mirror.appendChild(torso);
     mirror.appendChild(armF1); mirror.appendChild(armF2);
-    mirror.appendChild(torso); mirror.appendChild(head); mirror.appendChild(weight);
+    mirror.appendChild(head); mirror.appendChild(hair);
+    mirror.appendChild(handDot); mirror.appendChild(footDotF); mirror.appendChild(footDotB);
+    mirror.appendChild(weight);
     var gFront = el("g", {});
-    var headF = el("circle", { r: 12, fill: "#ffffff" });
-    var torsoF = limb("#ffffff", 11);
-    var armFL = limb("#ffffff", 8), armFR = limb("#ffffff", 8);
-    var legFL = limb("#ffffff", 9), legFR = limb("#ffffff", 9);
-    gFront.appendChild(headF); gFront.appendChild(torsoF);
+    var headF = el("circle", { r: 14, fill: C.skin });
+    var hairF = el("path", { d: "M -14 0 A 14 14 0 0 1 14 0 Z", fill: C.hair });
+    var torsoF = limb(C.shirt, 20);
+    var armFL = limb(C.shirt, 11), armFR = limb(C.shirt, 11);
+    var legFL = limb(C.pants, 13), legFR = limb(C.pants, 13);
+    var handDotFL = skinDot(5), handDotFR = skinDot(5);
+    var footDotFL = skinDot(5), footDotFR = skinDot(5);
+    gFront.appendChild(headF); gFront.appendChild(hairF); gFront.appendChild(torsoF);
     gFront.appendChild(armFL); gFront.appendChild(armFR);
     gFront.appendChild(legFL); gFront.appendChild(legFR);
-    svg.appendChild(ground); svg.appendChild(wall); svg.appendChild(mirror); svg.appendChild(gFront);
+    gFront.appendChild(handDotFL); gFront.appendChild(handDotFR);
+    gFront.appendChild(footDotFL); gFront.appendChild(footDotFR);
+    svg.appendChild(shadow); svg.appendChild(ground); svg.appendChild(wall);
+    svg.appendChild(mirror); svg.appendChild(gFront);
     container.appendChild(svg);
 
     var currentPattern = "squat", currentWeight = null, currentFlip = false;
@@ -375,12 +406,18 @@
         mirror.style.display = "none";
         gFront.style.display = "block";
         var s = out.front.spread;
-        headF.setAttribute("cx", 110); headF.setAttribute("cy", 30);
+        dot(headF, pt(110, 30));
+        hairF.setAttribute("transform", "translate(110 30)");
         line(torsoF, pt(110, 52), pt(110, 104));
-        line(armFL, pt(110, 56), pt(110 - (14 + 22 * s), 104 - 96 * s));
-        line(armFR, pt(110, 56), pt(110 + (14 + 22 * s), 104 - 96 * s));
-        line(legFL, pt(110, 104), pt(110 - 28 * s, 180));
-        line(legFR, pt(110, 104), pt(110 + 28 * s, 180));
+        var wL = pt(110 - (14 + 22 * s), 104 - 96 * s);
+        var wR = pt(110 + (14 + 22 * s), 104 - 96 * s);
+        var aL = pt(110 - 28 * s, 180), aR = pt(110 + 28 * s, 180);
+        line(armFL, pt(110, 56), wL);
+        line(armFR, pt(110, 56), wR);
+        line(legFL, pt(110, 104), aL);
+        line(legFR, pt(110, 104), aR);
+        dot(handDotFL, wL); dot(handDotFR, wR);
+        dot(footDotFL, aL); dot(footDotFR, aR);
         weight.style.display = "none";
         return;
       }
@@ -390,11 +427,13 @@
       line(legB1, j.hip, j.kneeB); line(legB2, j.kneeB, j.ankleB);
       line(armB1, j.shoulder, j.elbowB); line(armB2, j.elbowB, j.wristB);
       line(legF1, j.hip, j.kneeF); line(legF2, j.kneeF, j.ankleF);
-      line(armF1, j.shoulder, j.elbowF); line(armF2, j.elbowF, j.wristF);
       line(torso, j.hip, j.shoulder);
-      head.setAttribute("cx", j.head.x); head.setAttribute("cy", j.head.y);
+      line(armF1, j.shoulder, j.elbowF); line(armF2, j.elbowF, j.wristF);
+      dot(head, j.head);
+      hair.setAttribute("transform", "translate(" + j.head.x + " " + j.head.y + ")");
+      dot(handDot, j.wristF); dot(footDotF, j.ankleF); dot(footDotB, j.ankleB);
       if (j.weight) {
-        weight.setAttribute("cx", j.weight.x); weight.setAttribute("cy", j.weight.y);
+        dot(weight, j.weight);
         weight.style.display = "block";
       } else {
         weight.style.display = "none";
