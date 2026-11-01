@@ -21,9 +21,9 @@
   .presets { display: flex; gap: 8px; flex-wrap: wrap; }
   .presets button { flex: 1 1 45%; padding: 10px 6px; font-size: 14px; border: 0; border-radius: 10px; background: #374151; color: #fff; cursor: pointer; }
   .presets button:active { background: #4b5563; }
-  .row { display: flex; gap: 12px; }
+  .row { display: flex; gap: 12px; align-items: flex-start; }
   .field { flex: 1; }
-  .field label { display: block; font-size: 13px; color: #9ca3af; margin-bottom: 6px; }
+  .field label { display: block; font-size: 13px; color: #9ca3af; margin-bottom: 6px; white-space: nowrap; }
   .field input, .field select { width: 100%; padding: 12px; font-size: 18px; border: 0; border-radius: 10px; background: #374151; color: #fff; }
   .total { text-align: center; color: #9ca3af; font-size: 14px; margin: 4px 0 12px; }
   .big-btn { width: 100%; padding: 18px; font-size: 22px; font-weight: 700; border: 0; border-radius: 14px; background: #16a34a; color: #fff; cursor: pointer; }
@@ -44,21 +44,6 @@
   .phase.rest { background: #2563eb; }
   .phase.roundrest { background: #0d9488; }
   .phase.done { background: #6d28d9; }
-  body.big-text .phase-label { font-size: 36px; }
-  body.big-text .phase-label.station { font-size: 30px; }
-  body.big-text .round { font-size: 24px; }
-  body.big-text .next { font-size: 19px; }
-  body.big-text .elapsed { font-size: 17px; }
-  body.big-text .controls button { font-size: 20px; }
-  body.big-text .r-name { font-size: 21px; }
-  body.big-text .r-sum { font-size: 16px; }
-  body.big-text .field label { font-size: 16px; }
-  body.big-text .field input, body.big-text .field select { font-size: 21px; }
-  body.big-text .presets button { font-size: 17px; }
-  body.big-text .tabs button { font-size: 19px; }
-  body.big-text .big-btn { font-size: 25px; }
-  body.big-text .sub { font-size: 17px; }
-  body.big-text .check { font-size: 18px; }
   .phase-label { font-size: 30px; font-weight: 800; letter-spacing: 2px; }
   .clock { font-size: clamp(64px, 22vw, 96px); font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .round { font-size: 20px; margin-top: 6px; }
@@ -97,7 +82,6 @@
       <button id="tabCircuitBtn">Circuits</button>
     </div>
     <p class="sub" style="margin-top:0">First time? Start with Circuits, it names each move for you.</p>
-    <label class="check"><input id="bigTextToggle" type="checkbox"> Larger text</label>
 
     <div id="timerSetup">
     <div class="card">
@@ -112,11 +96,11 @@
     <div class="card">
       <div class="row">
         <div class="field">
-          <label for="workInput">Work (seconds)</label>
+          <label for="workInput">Work (sec)</label>
           <input id="workInput" type="number" inputmode="numeric" min="5" max="600" value="30">
         </div>
         <div class="field">
-          <label for="restInput">Rest (seconds)</label>
+          <label for="restInput">Rest (sec)</label>
           <input id="restInput" type="number" inputmode="numeric" min="0" max="600" value="30">
         </div>
         <div class="field">
@@ -126,9 +110,9 @@
         <div class="field">
           <label for="timerGetReady">Get-ready</label>
           <select id="timerGetReady">
-            <option value="5" selected>5 sec</option>
-            <option value="10">10 sec</option>
-            <option value="15">15 sec</option>
+            <option value="5" selected>5s</option>
+            <option value="10">10s</option>
+            <option value="15">15s</option>
           </select>
         </div>
       </div>
@@ -148,9 +132,9 @@
         <div class="field">
           <label for="circuitGetReady">Get-ready</label>
           <select id="circuitGetReady">
-            <option value="5" selected>5 sec</option>
-            <option value="10">10 sec</option>
-            <option value="15">15 sec</option>
+            <option value="5" selected>5s</option>
+            <option value="10">10s</option>
+            <option value="15">15s</option>
           </select>
         </div>
       </div>
@@ -846,7 +830,6 @@ function saveSettings() {
     timerGetReady: $("timerGetReady").value, circuitGetReady: $("circuitGetReady").value,
     music: $("musicSelect").value, restMusic: $("musicRestSelect").value,
     vol: $("volInput").value, sound: $("soundToggle").checked ? "1" : "0",
-    bigText: $("bigTextToggle").checked ? "1" : "0",
     tab: $("circuitSetup").style.display === "block" ? "circuits" : "timer"
   };
   storeSet("it-settings", JSON.stringify(s));
@@ -867,7 +850,6 @@ function loadSettings() {
   if (s.restMusic) $("musicRestSelect").value = s.restMusic;
   if (s.vol) { $("volInput").value = s.vol; workAudio.volume = s.vol / 100; restAudio.volume = s.vol / 100; }
   if (s.sound === "0") $("soundToggle").checked = false;
-  if (s.bigText === "1") { $("bigTextToggle").checked = true; document.body.classList.add("big-text"); }
   if (s.tab === "circuits") showTab("circuits");
 }
 $("timerGetReady").addEventListener("change", function () { updateTotal(); saveSettings(); });
@@ -884,10 +866,6 @@ $("volInput2").addEventListener("input", function () {
 });
 $("soundToggle2").addEventListener("change", function () {
   $("soundToggle").checked = $("soundToggle2").checked;
-  saveSettings();
-});
-$("bigTextToggle").addEventListener("change", function () {
-  document.body.classList.toggle("big-text", $("bigTextToggle").checked);
   saveSettings();
 });
 $("tabTimerBtn").addEventListener("click", saveSettings);
