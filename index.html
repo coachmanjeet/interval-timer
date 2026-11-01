@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16a34a">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -42,7 +42,23 @@
   .phase.ready { background: #d97706; }
   .phase.work { background: #16a34a; }
   .phase.rest { background: #2563eb; }
+  .phase.roundrest { background: #0d9488; }
   .phase.done { background: #6d28d9; }
+  body.big-text .phase-label { font-size: 36px; }
+  body.big-text .phase-label.station { font-size: 30px; }
+  body.big-text .round { font-size: 24px; }
+  body.big-text .next { font-size: 19px; }
+  body.big-text .elapsed { font-size: 17px; }
+  body.big-text .controls button { font-size: 20px; }
+  body.big-text .r-name { font-size: 21px; }
+  body.big-text .r-sum { font-size: 16px; }
+  body.big-text .field label { font-size: 16px; }
+  body.big-text .field input, body.big-text .field select { font-size: 21px; }
+  body.big-text .presets button { font-size: 17px; }
+  body.big-text .tabs button { font-size: 19px; }
+  body.big-text .big-btn { font-size: 25px; }
+  body.big-text .sub { font-size: 17px; }
+  body.big-text .check { font-size: 18px; }
   .phase-label { font-size: 30px; font-weight: 800; letter-spacing: 2px; }
   .clock { font-size: clamp(64px, 22vw, 96px); font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .round { font-size: 20px; margin-top: 6px; }
@@ -80,14 +96,16 @@
       <button id="tabTimerBtn" class="active">Timer</button>
       <button id="tabCircuitBtn">Circuits</button>
     </div>
+    <p class="sub" style="margin-top:0">First time? Start with Circuits, it names each move for you.</p>
+    <label class="check"><input id="bigTextToggle" type="checkbox"> Larger text</label>
 
     <div id="timerSetup">
     <div class="card">
       <div class="presets">
-        <button data-preset="30,30,8">30 / 30 &times; 8</button>
-        <button data-preset="40,20,10">40 / 20 &times; 10</button>
-        <button data-preset="20,10,8">Tabata 20 / 10 &times; 8</button>
-        <button data-preset="60,30,10">60 / 30 &times; 10</button>
+        <button data-preset="30,30,8">Work 30s, rest 30s, 8 rounds</button>
+        <button data-preset="40,20,10">Work 40s, rest 20s, 10 rounds</button>
+        <button data-preset="20,10,8">Tabata: 20s work, 10s rest, 8 rounds</button>
+        <button data-preset="60,30,10">Work 60s, rest 30s, 10 rounds</button>
       </div>
     </div>
 
@@ -105,6 +123,14 @@
           <label for="roundsInput">Rounds</label>
           <input id="roundsInput" type="number" inputmode="numeric" min="1" max="99" value="8">
         </div>
+        <div class="field">
+          <label for="timerGetReady">Get-ready</label>
+          <select id="timerGetReady">
+            <option value="5" selected>5 sec</option>
+            <option value="10">10 sec</option>
+            <option value="15">15 sec</option>
+          </select>
+        </div>
       </div>
       <p class="total" id="totalLine"></p>
     </div>
@@ -114,11 +140,21 @@
 
     <div id="circuitSetup" style="display:none">
     <div class="card">
-      <div class="field">
-        <label for="circuitRoundsInput">Rounds (whole circuit)</label>
-        <input id="circuitRoundsInput" type="number" inputmode="numeric" min="1" max="10" value="3">
+      <div class="row">
+        <div class="field">
+          <label for="circuitRoundsInput">Rounds (whole circuit)</label>
+          <input id="circuitRoundsInput" type="number" inputmode="numeric" min="1" max="10" value="3">
+        </div>
+        <div class="field">
+          <label for="circuitGetReady">Get-ready</label>
+          <select id="circuitGetReady">
+            <option value="5" selected>5 sec</option>
+            <option value="10">10 sec</option>
+            <option value="15">15 sec</option>
+          </select>
+        </div>
       </div>
-      <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">60 seconds rest between rounds. Tap a routine to start it. The timer names each station and shows what comes next.</p>
+      <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">First time? Try 1 round. 60 seconds rest between rounds. Tap a routine to start it. The timer names each station and shows what comes next.</p>
     </div>
 
     <div class="card">
@@ -126,7 +162,7 @@
     </div>
     </div>
 
-    <details class="card">
+    <details class="card" id="musicDetails">
       <summary>Music and sound</summary>
       <div class="field">
         <label for="musicSelect">Workout music (high-energy rock)</label>
@@ -155,7 +191,7 @@
       <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">Tap this first on your phone. You should hear a tick, then the voice say "Go". If you hear nothing, check the silent switch and volume.</p>
     </details>
 
-    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v6: human-style animated figures, compact setup</p>
+    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v7: quick wins, forgiving controls, remembered settings</p>
   </div>
 
   <!-- TIMER -->
@@ -194,6 +230,11 @@
           <option value="music/meditation-impromptu-01.mp3">Meditation Impromptu (calm piano)</option>
         </select>
       </div>
+      <div style="margin-top:12px">
+        <label for="volInput2" style="font-size:13px;color:#9ca3af">Music volume</label>
+        <input id="volInput2" type="range" min="0" max="100" value="70">
+      </div>
+      <label class="check"><input id="soundToggle2" type="checkbox" checked> Timer sounds and voice on</label>
     </details>
   </div>
 
@@ -203,6 +244,7 @@
 <audio id="cueReady" preload="auto" data-cue src="voice/get-ready.mp3"></audio>
 <audio id="cueGo" preload="auto" data-cue src="voice/go.mp3"></audio>
 <audio id="cueRest" preload="auto" data-cue src="voice/rest.mp3"></audio>
+<audio id="cueRoundRest" preload="auto" data-cue src="voice/round-rest.mp3"></audio>
 <audio id="cueDone" preload="auto" data-cue src="voice/complete.mp3"></audio>
 
 <script src="figure.js"></script>
@@ -281,6 +323,7 @@ function cueMap() {
       "Get ready": $("cueReady"),
       "Go": $("cueGo"),
       "Rest": $("cueRest"),
+      "Round rest": $("cueRoundRest"),
       "Workout complete": $("cueDone")
     };
   }
@@ -390,7 +433,7 @@ var ROUTINES = [
     { name: "Calf Raises", work: 40, rest: 20 },
     { name: "Wall Sit", work: 40, rest: 20 },
     { name: "Step-Back Lunge", work: 40, rest: 20 } ] },
-  { name: "Dumbbell Full-Body", roundRest: 60, stations: [
+  { name: "Dumbbell Full-Body", roundRest: 60, equipment: "Needs dumbbells", stations: [
     { name: "Goblet Squat", work: 40, rest: 20 },
     { name: "Dumbbell Press", work: 40, rest: 20 },
     { name: "Bent Row", work: 40, rest: 20 },
@@ -419,8 +462,13 @@ function slugify(name) {
     });
   });
 })();
+function getReadySec(which) {
+  var el = $(which === "circuit" ? "circuitGetReady" : "timerGetReady");
+  var v = el ? parseInt(el.value, 10) : 5;
+  return (v === 10 || v === 15) ? v : 5;
+}
 function buildClassicPhases() {
-  var list = [{ type: "ready", ms: 5000, round: 1 }];
+  var list = [{ type: "ready", ms: getReadySec("timer") * 1000, round: 1 }];
   for (var r = 1; r <= rounds; r++) {
     list.push({ type: "work", ms: workSec * 1000, round: r });
     if (r < rounds && restSec > 0) {
@@ -430,7 +478,7 @@ function buildClassicPhases() {
   return list;
 }
 function buildCircuitPhases(routine, nRounds) {
-  var list = [{ type: "ready", ms: 5000, round: 1 }];
+  var list = [{ type: "ready", ms: getReadySec("circuit") * 1000, round: 1 }];
   var stations = routine.stations;
   for (var r = 1; r <= nRounds; r++) {
     for (var i = 0; i < stations.length; i++) {
@@ -461,23 +509,24 @@ function fmt(ms) {
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
 }
 function totalMs() {
-  return 5000 + rounds * workSec * 1000 + Math.max(0, rounds - 1) * restSec * 1000;
+  return getReadySec("timer") * 1000 + rounds * workSec * 1000 + Math.max(0, rounds - 1) * restSec * 1000;
 }
 function updateTotal() {
   workSec = Math.min(600, Math.max(5, parseInt($("workInput").value, 10) || 30));
   restSec = Math.min(600, Math.max(0, parseInt($("restInput").value, 10) || 0));
   rounds = Math.min(99, Math.max(1, parseInt($("roundsInput").value, 10) || 8));
   var t = totalMs();
-  $("totalLine").textContent = "Total workout: about " + Math.round(t / 60000) + " min (includes 5 sec get-ready)";
+  $("totalLine").textContent = "Total workout: about " + Math.round(t / 60000) + " min (includes " + getReadySec("timer") + " sec get-ready)";
 }
 ["workInput", "restInput", "roundsInput"].forEach(function (id) {
-  $(id).addEventListener("input", updateTotal);
+  $(id).addEventListener("input", function () { updateTotal(); saveSettings(); });
 });
 document.querySelectorAll("[data-preset]").forEach(function (b) {
   b.addEventListener("click", function () {
     var p = b.dataset.preset.split(",");
     $("workInput").value = p[0]; $("restInput").value = p[1]; $("roundsInput").value = p[2];
     updateTotal();
+    saveSettings();
   });
 });
 updateTotal();
@@ -546,7 +595,7 @@ function showPhase() {
   label.textContent =
     phase === "ready" ? "GET READY" :
     phase === "work" ? (currentStation ? currentStation.toUpperCase() : "WORK") :
-    phase === "rest" ? "RECOVER" :
+    phase === "rest" ? "REST" :
     phase === "roundrest" ? "ROUND REST" : "DONE";
   if (phase === "done") {
     $("roundLabel").textContent = "Workout complete";
@@ -556,12 +605,15 @@ function showPhase() {
   } else {
     $("roundLabel").textContent = "Round " + round + " of " + rounds;
   }
-  $("nextLabel").textContent = (circuitMode && currentNext) ? "Next: " + currentNext : "";
+  $("nextLabel").textContent = (circuitMode && currentNext) ?
+    ((phase === "rest" || phase === "roundrest") ? "Up next: " + currentNext : "Next: " + currentNext) : "";
 }
 function render() {
   $("clock").textContent = fmt(remaining);
   $("barFill").style.width = (100 * (1 - remaining / phaseTotal)) + "%";
-  $("elapsedLine").textContent = "Elapsed " + fmt(elapsedMs + (paused ? 0 : (Date.now() - elapsedBase)));
+  var totalElapsed = elapsedMs + (paused ? 0 : (Date.now() - elapsedBase));
+  var totalLeft = Math.max(0, totalWorkoutMs - totalElapsed);
+  $("elapsedLine").textContent = "Elapsed " + fmt(totalElapsed) + " · Total left " + fmt(totalLeft);
 }
 function enterPhase(i) {
   phaseIdx = i;
@@ -574,16 +626,31 @@ function enterPhase(i) {
   phaseTotal = p.ms; remaining = p.ms;
   endAt = Date.now() + p.ms; lastTickSec = -1;
   showPhase();
-  if (p.type === "ready") { speak("Get ready"); }
+  if (p.type === "ready") {
+    speak("Get ready");
+    // Name the first station while the user still has time to get into
+    // position, not only when work starts. Chained on the cue's end so
+    // the two recordings never overlap.
+    if (circuitMode && phases[1] && phases[1].station) {
+      var firstStation = phases[1].station;
+      var readyEl = $("cueReady");
+      var onReadyEnded = function () {
+        readyEl.removeEventListener("ended", onReadyEnded);
+        if (phase === "ready") speakStation(firstStation);
+      };
+      readyEl.addEventListener("ended", onReadyEnded);
+    }
+  }
   if (p.type === "work") { workSound(); if (currentStation) speakStation(currentStation); else speak("Go"); }
-  if (p.type === "rest" || p.type === "roundrest") { restSound(); speak("Rest"); }
+  if (p.type === "rest") { restSound(); speak("Rest"); }
+  if (p.type === "roundrest") { restSound(); speak("Round rest"); }
   applyMusic();
   updateFigure();
 }
 // ---------- Exercise figure (circuits only) ----------
 // Work shows the current station animating; rest shows the next station
-// dimmed as a preview; get-ready shows the first station. Classic mode
-// hides the stage entirely.
+// at full brightness, labeled "Up next"; get-ready shows the first
+// station. Classic mode hides the stage entirely.
 var fig = null;
 function updateFigure() {
   var box = $("stageBox");
@@ -593,7 +660,7 @@ function updateFigure() {
   if (phase === "done") { fig.stop(); return; }
   if (phase === "ready") { fig.setStation(phases[1].station, false); return; }
   if (phase === "work") { fig.setStation(currentStation, false); return; }
-  if (currentNext && currentNext !== "Round rest") { fig.setStation(currentNext, true); }
+  if (currentNext && currentNext !== "Round rest") { fig.setStation(currentNext, false); }
 }
 function advance() {
   if (phaseIdx + 1 < phases.length) { enterPhase(phaseIdx + 1); return; }
@@ -607,6 +674,12 @@ function finish() {
   if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
   finishSound(); speak("Workout complete");
   $("pauseBtn").textContent = "Pause";
+  // The finish screen is not a dead end: hide the buttons that do nothing
+  // now, and label the live ones by what they actually do.
+  $("pauseBtn").style.display = "none";
+  $("skipBtn").style.display = "none";
+  $("restartBtn").textContent = "Do it again";
+  $("endBtn").textContent = "Back to setup";
 }
 function tickFn() {
   var now = Date.now();
@@ -636,11 +709,22 @@ function startCircuit(idx) {
   phases = buildCircuitPhases(ROUTINES[idx], circuitRounds);
   beginWorkout();
 }
+var totalWorkoutMs = 0;
+function resetTimerButtons() {
+  $("pauseBtn").style.display = "";
+  $("skipBtn").style.display = "";
+  $("restartBtn").textContent = "Restart";
+  $("endBtn").textContent = "End";
+}
 function beginWorkout() {
   $("setupView").style.display = "none";
   $("timerView").style.display = "block";
   $("musicSelect2").value = $("musicSelect").value;
   $("musicRestSelect2").value = $("musicRestSelect").value;
+  $("volInput2").value = $("volInput").value;
+  $("soundToggle2").checked = $("soundToggle").checked;
+  resetTimerButtons();
+  totalWorkoutMs = phases.reduce(function (sum, p) { return sum + p.ms; }, 0);
   unlockAudio(); // unlock audio on the tap
   unlockMusic(); // prime music elements so later play() calls are allowed on iOS
   running = true; paused = false; elapsedMs = 0; elapsedBase = Date.now();
@@ -651,6 +735,7 @@ function beginWorkout() {
   applyMusic();
   $("pauseBtn").textContent = "Pause";
   render();
+  saveSettings();
 }
 function pauseToggle() {
   if (!running) return;
@@ -678,13 +763,20 @@ $("testSoundBtn").addEventListener("click", function () {
   unlockMusic();
   tick();
   setTimeout(function () { speak("Go"); }, 300);
+  try { window.localStorage.setItem("it-sound-tested", "1"); } catch (e) {}
 });
 $("startBtn").addEventListener("click", startTimer);
 $("pauseBtn").addEventListener("click", pauseToggle);
-$("skipBtn").addEventListener("click", function () { if (running && !paused) advance(); });
+$("skipBtn").addEventListener("click", function () {
+  // Skip works while paused too: it steps to the next phase and stays
+  // paused, so a paused user can preview what comes next.
+  if (running) advance();
+});
 $("restartBtn").addEventListener("click", function () {
+  if (running && !confirm("Restart this workout from the beginning?")) return;
   clearInterval(timerId);
   running = true; paused = false; elapsedMs = 0; elapsedBase = Date.now();
+  resetTimerButtons();
   enterPhase(0);
   if (circuitMode && fig) { fig.setPaused(false); fig.start(); }
   timerId = setInterval(tickFn, 100);
@@ -693,6 +785,7 @@ $("restartBtn").addEventListener("click", function () {
   $("pauseBtn").textContent = "Pause";
 });
 $("endBtn").addEventListener("click", function () {
+  if (running && !confirm("End this workout?")) return;
   clearInterval(timerId); timerId = null; running = false; paused = false;
   stopMusic();
   if (fig) fig.stop();
@@ -716,7 +809,7 @@ function routineTotalSec(routine, nRounds) {
     perRound += s.work;
     if (i < routine.stations.length - 1) perRound += s.rest;
   });
-  return 5 + nRounds * perRound + (nRounds - 1) * routine.roundRest;
+  return getReadySec("circuit") + nRounds * perRound + (nRounds - 1) * routine.roundRest;
 }
 function renderRoutineButtons() {
   var nRounds = Math.min(10, Math.max(1, parseInt($("circuitRoundsInput").value, 10) || 3));
@@ -733,14 +826,81 @@ function renderRoutineButtons() {
     var name = document.createElement("div"); name.className = "r-name"; name.textContent = r.name;
     var sum = document.createElement("div"); sum.className = "r-sum";
     sum.textContent = r.stations.length + " stations · " + workRange + " work / " + restRange + " rest · " +
-      nRounds + " rounds · about " + Math.round(routineTotalSec(r, nRounds) / 60) + " min";
+      nRounds + " rounds · about " + Math.round(routineTotalSec(r, nRounds) / 60) + " min" +
+      (r.equipment ? " · " + r.equipment : "");
+    if (r.name === "Full-Body Starter") { sum.textContent = "Start here · " + sum.textContent; }
     b.appendChild(name); b.appendChild(sum);
     b.addEventListener("click", function () { startCircuit(idx); });
     list.appendChild(b);
   });
 }
-$("circuitRoundsInput").addEventListener("input", renderRoutineButtons);
+$("circuitRoundsInput").addEventListener("input", function () { renderRoutineButtons(); saveSettings(); });
+
+// ---------- Remember settings across visits (local only, no account) ----------
+function storeGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
+function storeSet(k, v) { try { window.localStorage.setItem(k, v); } catch (e) {} }
+function saveSettings() {
+  var s = {
+    work: $("workInput").value, rest: $("restInput").value, rounds: $("roundsInput").value,
+    circuitRounds: $("circuitRoundsInput").value,
+    timerGetReady: $("timerGetReady").value, circuitGetReady: $("circuitGetReady").value,
+    music: $("musicSelect").value, restMusic: $("musicRestSelect").value,
+    vol: $("volInput").value, sound: $("soundToggle").checked ? "1" : "0",
+    bigText: $("bigTextToggle").checked ? "1" : "0",
+    tab: $("circuitSetup").style.display === "block" ? "circuits" : "timer"
+  };
+  storeSet("it-settings", JSON.stringify(s));
+}
+function loadSettings() {
+  var raw = storeGet("it-settings");
+  if (!raw) return;
+  var s = null;
+  try { s = JSON.parse(raw); } catch (e) { return; }
+  if (!s) return;
+  if (s.work) $("workInput").value = s.work;
+  if (s.rest) $("restInput").value = s.rest;
+  if (s.rounds) $("roundsInput").value = s.rounds;
+  if (s.circuitRounds) $("circuitRoundsInput").value = s.circuitRounds;
+  if (s.timerGetReady) $("timerGetReady").value = s.timerGetReady;
+  if (s.circuitGetReady) $("circuitGetReady").value = s.circuitGetReady;
+  if (s.music) $("musicSelect").value = s.music;
+  if (s.restMusic) $("musicRestSelect").value = s.restMusic;
+  if (s.vol) { $("volInput").value = s.vol; workAudio.volume = s.vol / 100; restAudio.volume = s.vol / 100; }
+  if (s.sound === "0") $("soundToggle").checked = false;
+  if (s.bigText === "1") { $("bigTextToggle").checked = true; document.body.classList.add("big-text"); }
+  if (s.tab === "circuits") showTab("circuits");
+}
+$("timerGetReady").addEventListener("change", function () { updateTotal(); saveSettings(); });
+$("circuitGetReady").addEventListener("change", function () { renderRoutineButtons(); saveSettings(); });
+$("musicSelect").addEventListener("change", saveSettings);
+$("musicRestSelect").addEventListener("change", saveSettings);
+$("volInput").addEventListener("input", function () { $("volInput2").value = $("volInput").value; saveSettings(); });
+$("soundToggle").addEventListener("change", function () { $("soundToggle2").checked = $("soundToggle").checked; saveSettings(); });
+$("volInput2").addEventListener("input", function () {
+  $("volInput").value = $("volInput2").value;
+  workAudio.volume = $("volInput2").value / 100;
+  restAudio.volume = $("volInput2").value / 100;
+  saveSettings();
+});
+$("soundToggle2").addEventListener("change", function () {
+  $("soundToggle").checked = $("soundToggle2").checked;
+  saveSettings();
+});
+$("bigTextToggle").addEventListener("change", function () {
+  document.body.classList.toggle("big-text", $("bigTextToggle").checked);
+  saveSettings();
+});
+$("tabTimerBtn").addEventListener("click", saveSettings);
+$("tabCircuitBtn").addEventListener("click", saveSettings);
+loadSettings();
+updateTotal();
 renderRoutineButtons();
+// First run: leave the sound panel open until Test sound has been tapped
+// once, so the check is visible instead of hidden in a collapsed toggle.
+if (!storeGet("it-sound-tested")) {
+  var md = $("musicDetails");
+  if (md) md.open = true;
+}
 </script>
 </body>
 </html>
