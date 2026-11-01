@@ -33,6 +33,8 @@
   input[type="range"] { width: 100%; accent-color: #16a34a; }
   /* Timer view */
   #timerView { display: none; }
+  .stage { background: #1f2937; border-radius: 20px; padding: 6px 10px; margin-top: 12px; }
+  .stage svg { max-height: 240px; }
   .phase { border-radius: 20px; padding: 28px 16px 20px; text-align: center; transition: background 0.3s; }
   .phase.ready { background: #d97706; }
   .phase.work { background: #16a34a; }
@@ -149,7 +151,7 @@
       <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">Tap this first on your phone. You should hear a tick, then the voice say "Go". If you hear nothing, check the silent switch and volume.</p>
     </div>
 
-    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v4: circuits mode with pre-recorded station voice cues</p>
+    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v5: circuits + animated exercise figures</p>
   </div>
 
   <!-- TIMER -->
@@ -161,6 +163,7 @@
       <div class="next" id="nextLabel"></div>
       <div class="bar"><div id="barFill"></div></div>
     </div>
+    <div class="stage" id="stageBox" style="display:none"></div>
     <p class="elapsed" id="elapsedLine">Elapsed 0:00</p>
     <div class="controls">
       <button id="pauseBtn" class="primary">Pause</button>
@@ -197,6 +200,7 @@
 <audio id="cueRest" preload="auto" data-cue src="voice/rest.mp3"></audio>
 <audio id="cueDone" preload="auto" data-cue src="voice/complete.mp3"></audio>
 
+<script src="figure.js"></script>
 <script>
 "use strict";
 var $ = function (id) { return document.getElementById(id); };
@@ -569,6 +573,22 @@ function enterPhase(i) {
   if (p.type === "work") { workSound(); if (currentStation) speakStation(currentStation); else speak("Go"); }
   if (p.type === "rest" || p.type === "roundrest") { restSound(); speak("Rest"); }
   applyMusic();
+  updateFigure();
+}
+// ---------- Exercise figure (circuits only) ----------
+// Work shows the current station animating; rest shows the next station
+// dimmed as a preview; get-ready shows the first station. Classic mode
+// hides the stage entirely.
+var fig = null;
+function updateFigure() {
+  var box = $("stageBox");
+  if (!circuitMode) { box.style.display = "none"; if (fig) fig.stop(); return; }
+  box.style.display = "block";
+  if (!fig) fig = createExerciseFigure(box);
+  if (phase === "done") { fig.stop(); return; }
+  if (phase === "ready") { fig.setStation(phases[1].station, false); return; }
+  if (phase === "work") { fig.setStation(currentStation, false); return; }
+  if (currentNext && currentNext !== "Round rest") { fig.setStation(currentNext, true); }
 }
 function advance() {
   if (phaseIdx + 1 < phases.length) { enterPhase(phaseIdx + 1); return; }
@@ -578,6 +598,7 @@ function finish() {
   clearInterval(timerId); timerId = null; running = false; paused = false;
   phase = "done"; remaining = 0; currentNext = null; showPhase(); render();
   stopMusic();
+  if (fig) fig.stop();
   if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
   finishSound(); speak("Workout complete");
   $("pauseBtn").textContent = "Pause";
@@ -619,6 +640,7 @@ function beginWorkout() {
   unlockMusic(); // prime music elements so later play() calls are allowed on iOS
   running = true; paused = false; elapsedMs = 0; elapsedBase = Date.now();
   enterPhase(0); // get-ready, which also speaks the first cue in the tap
+  if (circuitMode && fig) fig.start();
   timerId = setInterval(tickFn, 100);
   requestWake();
   applyMusic();
@@ -631,6 +653,7 @@ function pauseToggle() {
     clearInterval(timerId); timerId = null; paused = true;
     elapsedMs += Date.now() - elapsedBase;
     workAudio.pause(); restAudio.pause();
+    if (fig) fig.setPaused(true);
     $("pauseBtn").textContent = "Resume";
   } else {
     paused = false;
@@ -640,6 +663,7 @@ function pauseToggle() {
     requestWake();
     unlockAudio();
     applyMusic();
+    if (fig) fig.setPaused(false);
     $("pauseBtn").textContent = "Pause";
   }
   render();
@@ -657,6 +681,7 @@ $("restartBtn").addEventListener("click", function () {
   clearInterval(timerId);
   running = true; paused = false; elapsedMs = 0; elapsedBase = Date.now();
   enterPhase(0);
+  if (circuitMode && fig) { fig.setPaused(false); fig.start(); }
   timerId = setInterval(tickFn, 100);
   unlockAudio();
   applyMusic();
@@ -665,6 +690,7 @@ $("restartBtn").addEventListener("click", function () {
 $("endBtn").addEventListener("click", function () {
   clearInterval(timerId); timerId = null; running = false; paused = false;
   stopMusic();
+  if (fig) fig.stop();
   if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
   $("timerView").style.display = "none";
   $("setupView").style.display = "block";
