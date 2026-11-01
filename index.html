@@ -67,6 +67,8 @@
   .r-name { font-size: 18px; font-weight: 700; }
   .r-badge { font-size: 11px; font-weight: 600; color: #fff; background: #22c55e; padding: 2px 8px; border-radius: 999px; margin-left: 8px; vertical-align: middle; }
   .r-seq { font-size: 14px; color: #d1d5db; margin-top: 6px; }
+  .history-repeat { display: block; width: 100%; text-align: left; background: #1f2937; color: #e5e7eb; border: 0; border-radius: 12px; padding: 10px 14px; font-size: 14px; cursor: pointer; margin-bottom: 6px; }
+  .history-week { font-size: 13px; color: #9ca3af; margin: 0 0 12px; }
   .phase-label.station { font-size: 24px; letter-spacing: 1px; }
   .next { font-size: 16px; color: #d1d5db; margin-top: 4px; }
 </style>
@@ -84,6 +86,7 @@
       <button id="tabCircuitBtn">Circuits</button>
     </div>
     <p class="sub" style="margin-top:0">First time? Start with Circuits, it names each move for you.</p>
+    <div id="historyLine" style="display:none"></div>
 
     <div id="timerSetup">
     <div class="card">
@@ -119,6 +122,7 @@
         </div>
       </div>
       <p class="total" id="totalLine"></p>
+      <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">A round is one work period plus its rest. Get-ready counts down before work starts.</p>
     </div>
 
     <button class="big-btn" id="startBtn">START</button>
@@ -150,6 +154,7 @@
           <input id="circuitRestInput" type="number" inputmode="numeric" min="0" max="600" value="20">
         </div>
       </div>
+      <p class="total" id="circuitTotalLine"></p>
       <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">First time? Try 1 round. Work and rest apply to every station. 60 seconds rest between rounds. Tap a routine to start it. The timer names each station and shows what comes next.</p>
     </div>
 
@@ -171,6 +176,7 @@
         </select>
         <label for="musicRestSelect">Rest music (calm guitar)</label>
         <select id="musicRestSelect">
+          <option value="">No music</option>
           <option value="music/greensleeves.mp3" selected>Greensleeves</option>
           <option value="music/slow-burn.mp3">Slow Burn</option>
           <option value="music/the-parting.mp3">The Parting</option>
@@ -182,12 +188,13 @@
         <label for="volInput" style="font-size:13px;color:#9ca3af">Music volume</label>
         <input id="volInput" type="range" min="0" max="100" value="70">
       </div>
-      <label class="check"><input id="soundToggle" type="checkbox" checked> Timer sounds and voice on</label>
+      <p id="volNote" style="display:none;font-size:13px;color:#9ca3af;margin:8px 0 0">On iPhone, use the side buttons for music volume. This slider has no effect there.</p>
+      <label class="check"><input id="soundToggle" type="checkbox" checked> Timer sounds and voice on (music separate)</label>
       <button class="big-btn" id="testSoundBtn" style="margin-top:10px;background:#374151;font-size:17px;padding:14px">Test sound</button>
-      <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">Tap this first on your phone. You should hear a tick, then the voice say "Go". If you hear nothing, check the silent switch and volume.</p>
+      <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">Optional sound check. Tap Test sound: you should hear a tick, then the voice say "Go". START works without it. If you hear nothing, check "Timer sounds and voice on" is ticked, then the silent switch and volume.</p>
     </details>
 
-    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v13: music gap after cues cut to 1 second</p>
+    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v14: fixes + sticky three: durations, last-time repeat, weekly count</p>
   </div>
 
   <!-- TIMER -->
@@ -220,6 +227,7 @@
         </select>
         <label for="musicRestSelect2">Rest music</label>
         <select id="musicRestSelect2">
+          <option value="">No music</option>
           <option value="music/greensleeves.mp3" selected>Greensleeves</option>
           <option value="music/slow-burn.mp3">Slow Burn</option>
           <option value="music/the-parting.mp3">The Parting</option>
@@ -230,7 +238,9 @@
         <label for="volInput2" style="font-size:13px;color:#9ca3af">Music volume</label>
         <input id="volInput2" type="range" min="0" max="100" value="70">
       </div>
-      <label class="check"><input id="soundToggle2" type="checkbox" checked> Timer sounds and voice on</label>
+      <p id="volNote2" style="display:none;font-size:13px;color:#9ca3af;margin:8px 0 0">On iPhone, use the side buttons for music volume. This slider has no effect there.</p>
+      <label class="check"><input id="soundToggle2" type="checkbox" checked> Timer sounds and voice on (music separate)</label>
+      <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">Same settings as setup.</p>
     </details>
   </div>
 
@@ -360,6 +370,14 @@ function speakTTS(text) {
       var u = new SpeechSynthesisUtterance(text);
       if (pickedVoice) { u.voice = pickedVoice; }
       u.rate = 1;
+      u.onend = function () {
+        // If the Get ready file failed, its "ended" event never fires,
+        // so the first-station preview would be lost. Speak it here
+        // instead. Scoped to the Get ready cue only.
+        if (text === "Get ready" && running && phase === "ready" && readyStationToSpeak) {
+          var s = readyStationToSpeak; readyStationToSpeak = null; speakStation(s);
+        }
+      };
       synth.speak(u);
     } catch (e) {}
   }
@@ -394,7 +412,7 @@ var readyStationToSpeak = null;
 $("cueReady").addEventListener("ended", function () {
   var s = readyStationToSpeak;
   readyStationToSpeak = null;
-  if (phase === "ready" && s) speakStation(s);
+  if (running && phase === "ready" && s) speakStation(s);
 });
 
 // ---------- Wake lock (screen stays awake) ----------
@@ -417,7 +435,7 @@ var lastTickSec = -1, elapsedMs = 0, elapsedBase = 0;
 // round rest, done). Circuit phases also carry station name, position,
 // and the next station, for display and voice.
 var phases = [], phaseIdx = 0;
-var circuitMode = false, circuitRounds = 3;
+var circuitMode = false, circuitRounds = 3, lastRoutineIdx = 0;
 var currentStation = null, currentStationIdx = 0, currentStationCount = 0, currentNext = null;
 
 // ---------- Circuits: preloaded routines ----------
@@ -558,6 +576,31 @@ document.querySelectorAll("[data-preset]").forEach(function (b) {
     syncPresetSelection();
   });
 });
+// Preset tiles carry their duration, so a goal like "15 minutes" is one
+// tap, not mental math. Durations use the 5s default get-ready; a 10s
+// longer get-ready does not change any rounded minute.
+document.querySelectorAll("[data-preset]").forEach(function (b) {
+  var p = b.dataset.preset.split(",");
+  var w = parseInt(p[0], 10), r = parseInt(p[1], 10), n = parseInt(p[2], 10);
+  var t = 5 * 1000 + n * w * 1000 + Math.max(0, n - 1) * r * 1000;
+  b.textContent = b.textContent + " · about " + Math.round(t / 60000) + " min";
+});
+// Clamp typed numbers back into the field on blur, so the field and the
+// workout can never disagree. Dispatching input reuses the existing
+// handlers (total line, preset mark, saved settings).
+function clampNum(v, min, max, fb) {
+  var n = parseInt(v, 10);
+  if (isNaN(n)) n = fb;
+  return Math.min(max, Math.max(min, n));
+}
+[["workInput", 5, 600, 30], ["restInput", 0, 600, 0], ["roundsInput", 1, 99, 8],
+ ["circuitRoundsInput", 1, 10, 3], ["circuitWorkInput", 5, 600, 40], ["circuitRestInput", 0, 600, 0]
+].forEach(function (c) {
+  $(c[0]).addEventListener("blur", function () {
+    $(c[0]).value = clampNum($(c[0]).value, c[1], c[2], c[3]);
+    $(c[0]).dispatchEvent(new Event("input", { bubbles: true }));
+  });
+});
 updateTotal();
 
 // ---------- Music: workout track for work, rest track for rest, silence during get-ready ----------
@@ -649,8 +692,12 @@ function showPhase() {
   if (phase === "done") {
     $("roundLabel").textContent = "Workout complete";
   } else if (circuitMode) {
-    $("roundLabel").textContent = "Round " + round + " of " + circuitRounds +
-      (currentStation ? " · Station " + currentStationIdx + " of " + currentStationCount : "");
+    // During a break the counter names what is coming, not what just
+    // ended: rest shows the next station, round rest shows the next round.
+    var dispRound = (phase === "roundrest") ? round + 1 : round;
+    var dispStation = (phase === "rest") ? Math.min(currentStationIdx + 1, currentStationCount) : currentStationIdx;
+    $("roundLabel").textContent = "Round " + dispRound + " of " + circuitRounds +
+      (currentStation ? " · Station " + dispStation + " of " + currentStationCount : "");
   } else {
     $("roundLabel").textContent = "Round " + round + " of " + rounds;
   }
@@ -691,6 +738,7 @@ function enterPhase(i) {
   }
   applyMusic();
   updateFigure();
+  render();
 }
 // ---------- Exercise figure (circuits only) ----------
 // Work shows the current station animating; rest shows the next station
@@ -708,14 +756,24 @@ function updateFigure() {
   if (currentNext && currentNext !== "Round rest") { fig.setStation(currentNext, false); }
 }
 function advance() {
-  if (phaseIdx + 1 < phases.length) { enterPhase(phaseIdx + 1); return; }
+  if (phaseIdx + 1 < phases.length) {
+    // Skipped time must not linger in "Total left": drop the remainder
+    // of the phase being left. At a natural phase end the remainder is
+    // zero, so this changes nothing there.
+    totalWorkoutMs = Math.max(0, totalWorkoutMs - Math.max(0, remaining));
+    enterPhase(phaseIdx + 1); return;
+  }
   finish();
 }
 function finish() {
+  // Capture lived time first: after this point paused is false, so the
+  // render math would add stale time for a finish that came from a pause.
+  var lived = elapsedMs + (paused ? 0 : (Date.now() - elapsedBase));
   clearInterval(timerId); timerId = null; running = false; paused = false;
   phase = "done"; remaining = 0; currentNext = null; showPhase(); render();
   stopMusic();
   if (fig) fig.stop();
+  $("stageBox").style.display = "none";
   if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
   finishSound(); speak("Workout complete");
   $("pauseBtn").textContent = "Pause";
@@ -725,6 +783,8 @@ function finish() {
   $("skipBtn").style.display = "none";
   $("restartBtn").textContent = "Do it again";
   $("endBtn").textContent = "Back to setup";
+  recordFinish();
+  $("elapsedLine").textContent = "Finished in " + fmt(lived);
 }
 function tickFn() {
   var now = Date.now();
@@ -749,6 +809,7 @@ function startTimer() {
   beginWorkout();
 }
 function startCircuit(idx) {
+  lastRoutineIdx = idx;
   circuitRounds = Math.min(10, Math.max(1, parseInt($("circuitRoundsInput").value, 10) || 3));
   circuitMode = true;
   phases = buildCircuitPhases(ROUTINES[idx], circuitRounds);
@@ -826,6 +887,7 @@ $("restartBtn").addEventListener("click", function () {
   if (circuitMode && fig) { fig.setPaused(false); fig.start(); }
   timerId = setInterval(tickFn, 100);
   unlockAudio();
+  requestWake();
   applyMusic();
   $("pauseBtn").textContent = "Pause";
 });
@@ -837,6 +899,7 @@ $("endBtn").addEventListener("click", function () {
   if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
   $("timerView").style.display = "none";
   $("setupView").style.display = "block";
+  renderHistoryLine();
 });
 
 // ---------- Circuits setup: tabs + routine picker ----------
@@ -865,9 +928,24 @@ function renderRoutineButtons() {
     list.appendChild(b);
   });
 }
-$("circuitRoundsInput").addEventListener("input", function () { renderRoutineButtons(); saveSettings(); });
-$("circuitWorkInput").addEventListener("input", saveSettings);
-$("circuitRestInput").addEventListener("input", saveSettings);
+// Live circuit total, so a goal like "15 minutes" can be dialed in with
+// the fields before tapping a routine. All routines share 6 stations
+// and a 60s round rest, so the line is computed from the first routine.
+function updateCircuitTotal() {
+  var el = $("circuitTotalLine");
+  if (!el) return;
+  var nRounds = clampNum($("circuitRoundsInput").value, 1, 10, 3);
+  var work = clampNum($("circuitWorkInput").value, 5, 600, 40);
+  var rest = clampNum($("circuitRestInput").value, 0, 600, 0);
+  var stations = (ROUTINES[0] && ROUTINES[0].stations) ? ROUTINES[0].stations.length : 6;
+  var roundRest = (ROUTINES[0] && ROUTINES[0].roundRest) ? ROUTINES[0].roundRest : 60;
+  var t = getReadySec("circuit") * 1000 + nRounds * (stations * work + (stations - 1) * rest) * 1000 +
+    Math.max(0, nRounds - 1) * roundRest * 1000;
+  el.textContent = "About " + Math.round(t / 60000) + " min at " + nRounds + " rounds (includes get-ready and 60s round rests)";
+}
+$("circuitRoundsInput").addEventListener("input", function () { renderRoutineButtons(); saveSettings(); updateCircuitTotal(); });
+$("circuitWorkInput").addEventListener("input", function () { saveSettings(); updateCircuitTotal(); });
+$("circuitRestInput").addEventListener("input", function () { saveSettings(); updateCircuitTotal(); });
 
 // ---------- Remember settings across visits (local only, no account) ----------
 function storeGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
@@ -905,7 +983,7 @@ function loadSettings() {
   if (s.tab === "circuits") showTab("circuits");
 }
 $("timerGetReady").addEventListener("change", function () { updateTotal(); saveSettings(); });
-$("circuitGetReady").addEventListener("change", function () { renderRoutineButtons(); saveSettings(); });
+$("circuitGetReady").addEventListener("change", function () { renderRoutineButtons(); saveSettings(); updateCircuitTotal(); });
 $("musicSelect").addEventListener("change", saveSettings);
 $("musicRestSelect").addEventListener("change", saveSettings);
 $("volInput").addEventListener("input", function () { $("volInput2").value = $("volInput").value; saveSettings(); });
@@ -922,10 +1000,102 @@ $("soundToggle2").addEventListener("change", function () {
 });
 $("tabTimerBtn").addEventListener("click", saveSettings);
 $("tabCircuitBtn").addEventListener("click", saveSettings);
+// Sticky, local only, no account: remember each finish so setup can
+// offer a one-tap repeat and a quiet weekly count.
+function recordFinish() {
+  try {
+    var d = new Date();
+    var key = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    var dates = [];
+    try { dates = JSON.parse(window.localStorage.getItem("it-week") || "[]"); } catch (e) { dates = []; }
+    if (dates.indexOf(key) === -1) dates.push(key);
+    window.localStorage.setItem("it-week", JSON.stringify(dates));
+    var last;
+    if (circuitMode) {
+      last = { type: "circuit", routine: ROUTINES[lastRoutineIdx].name,
+        rounds: clampNum($("circuitRoundsInput").value, 1, 10, 3),
+        work: clampNum($("circuitWorkInput").value, 5, 600, 40),
+        rest: clampNum($("circuitRestInput").value, 0, 600, 0) };
+    } else {
+      last = { type: "timer",
+        work: clampNum($("workInput").value, 5, 600, 30),
+        rest: clampNum($("restInput").value, 0, 600, 0),
+        rounds: clampNum($("roundsInput").value, 1, 99, 8) };
+    }
+    window.localStorage.setItem("it-last", JSON.stringify(last));
+  } catch (e) {}
+}
+function repeatLast() {
+  var raw = storeGet("it-last");
+  if (!raw) return;
+  var last = null;
+  try { last = JSON.parse(raw); } catch (e) { return; }
+  if (!last) return;
+  if (last.type === "circuit") {
+    var idx = lastRoutineIdx;
+    ROUTINES.forEach(function (r, i) { if (r.name === last.routine) idx = i; });
+    showTab("circuits");
+    $("circuitRoundsInput").value = last.rounds;
+    $("circuitWorkInput").value = last.work;
+    $("circuitRestInput").value = last.rest;
+    saveSettings(); updateCircuitTotal();
+    startCircuit(idx);
+  } else {
+    showTab("timer");
+    $("workInput").value = last.work; $("restInput").value = last.rest; $("roundsInput").value = last.rounds;
+    updateTotal(); saveSettings(); syncPresetSelection();
+    startTimer();
+  }
+}
+function renderHistoryLine() {
+  var line = $("historyLine");
+  if (!line) return;
+  line.innerHTML = "";
+  var shown = false;
+  var raw = storeGet("it-last");
+  if (raw) {
+    try {
+      var last = JSON.parse(raw);
+      var txt = last.type === "circuit"
+        ? ("Last time: " + last.routine + ", " + last.rounds + (last.rounds == 1 ? " round" : " rounds"))
+        : ("Last time: " + last.work + "s work, " + last.rest + "s rest, " + last.rounds + (last.rounds == 1 ? " round" : " rounds"));
+      var b = document.createElement("button");
+      b.className = "history-repeat";
+      b.textContent = txt + " · Tap to repeat";
+      b.addEventListener("click", repeatLast);
+      line.appendChild(b);
+      shown = true;
+    } catch (e) {}
+  }
+  try {
+    var dates = JSON.parse(window.localStorage.getItem("it-week") || "[]");
+    var now = new Date();
+    var dow = (now.getDay() + 6) % 7;
+    var mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow);
+    var mkey = mon.getFullYear() + "-" + String(mon.getMonth() + 1).padStart(2, "0") + "-" + String(mon.getDate()).padStart(2, "0");
+    var count = dates.filter(function (dd) { return dd >= mkey; }).length;
+    if (count > 0) {
+      var w = document.createElement("p");
+      w.className = "history-week";
+      w.textContent = count + (count === 1 ? " session" : " sessions") + " this week";
+      line.appendChild(w);
+      shown = true;
+    }
+  } catch (e) {}
+  line.style.display = shown ? "block" : "none";
+}
 loadSettings();
 updateTotal();
 renderRoutineButtons();
 syncPresetSelection();
+updateCircuitTotal();
+renderHistoryLine();
+// iOS ignores the programmatic volume slider, so say so on iPhones
+// instead of letting the slider pretend to work.
+if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+  var vn = $("volNote"); if (vn) vn.style.display = "block";
+  var vn2 = $("volNote2"); if (vn2) vn2.style.display = "block";
+}
 // First run: leave the sound panel open until Test sound has been tapped
 // once, so the check is visible instead of hidden in a collapsed toggle.
 if (!storeGet("it-sound-tested")) {
