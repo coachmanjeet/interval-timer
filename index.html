@@ -21,6 +21,7 @@
   .presets { display: flex; gap: 8px; flex-wrap: wrap; }
   .presets button { flex: 1 1 45%; padding: 10px 6px; font-size: 14px; border: 0; border-radius: 10px; background: #374151; color: #fff; cursor: pointer; }
   .presets button:active { background: #4b5563; }
+  .presets button.selected { background: #16a34a; color: #fff; }
   .row { display: flex; gap: 12px; align-items: flex-start; }
   .field { flex: 1; }
   .field label { display: block; font-size: 13px; color: #9ca3af; margin-bottom: 6px; white-space: nowrap; }
@@ -175,7 +176,7 @@
       <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">Tap this first on your phone. You should hear a tick, then the voice say "Go". If you hear nothing, check the silent switch and volume.</p>
     </details>
 
-    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v8: no larger-text toggle, aligned setup fields</p>
+    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v9: silent start, steady voice, preset selection</p>
   </div>
 
   <!-- TIMER -->
@@ -299,7 +300,8 @@ function unlockAudio() {
 // iOS Safari silently drops speechSynthesis outside tap handlers, and can
 // drop it entirely on some phones, while laptop browsers play it fine. The
 // recorded files play through the same <audio> path as music, which iOS
-// allows from timer callbacks once primed in a tap.
+// allows from timer callbacks once the page's audio session is unlocked
+// by the Get ready cue playing inside the START tap.
 var cueEls = null;
 function cueMap() {
   if (!cueEls) {
@@ -313,17 +315,29 @@ function cueMap() {
   }
   return cueEls;
 }
+// Play a cue file, retrying once on a transient rejection before falling
+// back to live speech. iOS drops speechSynthesis utterances from timer
+// callbacks, so the file must get two chances before we give up on it.
+function playCue(el, text, attempt) {
+  if (!$("soundToggle").checked) return;
+  try {
+    el.currentTime = 0;
+    var p = el.play();
+    if (p && p.then) {
+      p.then(function () {}, function () {
+        if (attempt === 0) { setTimeout(function () { playCue(el, text, 1); }, 200); }
+        else { speakTTS(text); }
+      });
+    }
+  } catch (e) {
+    if (attempt === 0) { setTimeout(function () { playCue(el, text, 1); }, 200); }
+    else { speakTTS(text); }
+  }
+}
 function speak(text) {
   if (!$("soundToggle").checked) return;
   var a = cueMap()[text];
-  if (a) {
-    try {
-      a.currentTime = 0;
-      var p = a.play();
-      if (p && p.then) { p.then(function () {}, function () { speakTTS(text); }); }
-      return;
-    } catch (e) {}
-  }
+  if (a) { playCue(a, text, 0); return; }
   speakTTS(text);
 }
 function speakTTS(text) {
@@ -358,16 +372,19 @@ function stationAudio() {
 function speakStation(name) {
   if (!$("soundToggle").checked) return;
   var a = stationAudio()[slugify(name)];
-  if (a) {
-    try {
-      a.currentTime = 0;
-      var p = a.play();
-      if (p && p.then) { p.then(function () {}, function () { speakTTS(name); }); }
-      return;
-    } catch (e) {}
-  }
+  if (a) { playCue(a, name, 0); return; }
   speakTTS(name);
 }
+// First-station announcement during get-ready: one persistent handler,
+// not one per workout. The old code attached a new "ended" listener on
+// every get-ready, and a listener survived whenever its cue failed to
+// play, so restarts stacked up overlapping station names.
+var readyStationToSpeak = null;
+$("cueReady").addEventListener("ended", function () {
+  var s = readyStationToSpeak;
+  readyStationToSpeak = null;
+  if (phase === "ready" && s) speakStation(s);
+});
 
 // ---------- Wake lock (screen stays awake) ----------
 var wakeLock = null;
@@ -503,14 +520,27 @@ function updateTotal() {
   $("totalLine").textContent = "Total workout: about " + Math.round(t / 60000) + " min (includes " + getReadySec("timer") + " sec get-ready)";
 }
 ["workInput", "restInput", "roundsInput"].forEach(function (id) {
-  $(id).addEventListener("input", function () { updateTotal(); saveSettings(); });
+  $(id).addEventListener("input", function () { updateTotal(); saveSettings(); syncPresetSelection(); });
 });
+// Preset tiles show which one is active: a tap marks its tile green,
+// and any manual edit clears the mark, so the tile always tells the
+// truth about the numbers below it.
+function syncPresetSelection() {
+  var w = $("workInput").value, r = $("restInput").value, n = $("roundsInput").value;
+  document.querySelectorAll("[data-preset]").forEach(function (b) {
+    var p = b.dataset.preset.split(",");
+    var on = (p[0] === w && p[1] === r && p[2] === n);
+    b.classList.toggle("selected", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+}
 document.querySelectorAll("[data-preset]").forEach(function (b) {
   b.addEventListener("click", function () {
     var p = b.dataset.preset.split(",");
     $("workInput").value = p[0]; $("restInput").value = p[1]; $("roundsInput").value = p[2];
     updateTotal();
     saveSettings();
+    syncPresetSelection();
   });
 });
 updateTotal();
@@ -543,26 +573,31 @@ function applyMusic() {
   if (workAudio.getAttribute("src") !== workSrc) { workAudio.src = workSrc; }
   if (restAudio.getAttribute("src") !== restSrc) { restAudio.src = restSrc; }
   var a = activeAudio();
-  if (!workSrc || !a) { workAudio.pause(); restAudio.pause(); return; }
+  if (!a) { workAudio.pause(); restAudio.pause(); return; }
   var other = a === workAudio ? restAudio : workAudio;
   other.pause();
+  // Check the active track's own source, not the workout track's: the
+  // old code paused everything when workout music was "No music", which
+  // silently killed rest music too.
+  var src = a === workAudio ? workSrc : restSrc;
+  if (!src) { a.pause(); return; }
   if (running && !paused) { a.play().catch(function () {}); }
   else { a.pause(); }
 }
 function unlockMusic() {
-  // Prime audio elements inside the tap (muted) so later play()
-  // calls from the timer are allowed on iOS.
+  // Set the music sources and warm the cue files, silently. The old code
+  // "primed" by playing every file with volume set to 0 and pausing it,
+  // but iOS Safari ignores programmatic volume on <audio>, so on an
+  // iPhone all 27 files actually played at full volume for a second at
+  // start, and a late priming pause could cut the real Get ready cue
+  // dead. The real unlock is the Get ready cue itself, which plays
+  // synchronously inside the START tap; load() here just warms the cache.
   applyMusic();
   var els = [workAudio, restAudio];
   document.querySelectorAll("audio[data-cue], audio[data-station]").forEach(function (a) { els.push(a); });
   els.forEach(function (a) {
     if (!a.getAttribute("src")) return;
-    try {
-      var v = a.volume; a.volume = 0;
-      var p = a.play();
-      if (p && p.then) { p.then(function () { a.pause(); a.volume = v; }).catch(function () { a.volume = v; }); }
-      else { a.volume = v; }
-    } catch (e) {}
+    try { a.load(); } catch (e) {}
   });
 }
 $("musicSelect").addEventListener("change", syncPair("musicSelect", "musicSelect2"));
@@ -613,17 +648,10 @@ function enterPhase(i) {
   if (p.type === "ready") {
     speak("Get ready");
     // Name the first station while the user still has time to get into
-    // position, not only when work starts. Chained on the cue's end so
-    // the two recordings never overlap.
-    if (circuitMode && phases[1] && phases[1].station) {
-      var firstStation = phases[1].station;
-      var readyEl = $("cueReady");
-      var onReadyEnded = function () {
-        readyEl.removeEventListener("ended", onReadyEnded);
-        if (phase === "ready") speakStation(firstStation);
-      };
-      readyEl.addEventListener("ended", onReadyEnded);
-    }
+    // position, not only when work starts. The persistent "ended"
+    // handler above speaks it when the Get ready cue finishes, so the
+    // two recordings never overlap.
+    readyStationToSpeak = (circuitMode && phases[1] && phases[1].station) ? phases[1].station : null;
   }
   if (p.type === "work") { workSound(); if (currentStation) speakStation(currentStation); else speak("Go"); }
   if (p.type === "rest") { restSound(); speak("Rest"); }
@@ -710,7 +738,7 @@ function beginWorkout() {
   resetTimerButtons();
   totalWorkoutMs = phases.reduce(function (sum, p) { return sum + p.ms; }, 0);
   unlockAudio(); // unlock audio on the tap
-  unlockMusic(); // prime music elements so later play() calls are allowed on iOS
+  unlockMusic(); // set music sources and warm cue files (silent); the Get ready cue in this tap unlocks later plays
   running = true; paused = false; elapsedMs = 0; elapsedBase = Date.now();
   enterPhase(0); // get-ready, which also speaks the first cue in the tap
   if (circuitMode && fig) fig.start();
@@ -846,8 +874,8 @@ function loadSettings() {
   if (s.circuitRounds) $("circuitRoundsInput").value = s.circuitRounds;
   if (s.timerGetReady) $("timerGetReady").value = s.timerGetReady;
   if (s.circuitGetReady) $("circuitGetReady").value = s.circuitGetReady;
-  if (s.music) $("musicSelect").value = s.music;
-  if (s.restMusic) $("musicRestSelect").value = s.restMusic;
+  if (s.music !== undefined) $("musicSelect").value = s.music;
+  if (s.restMusic !== undefined) $("musicRestSelect").value = s.restMusic;
   if (s.vol) { $("volInput").value = s.vol; workAudio.volume = s.vol / 100; restAudio.volume = s.vol / 100; }
   if (s.sound === "0") $("soundToggle").checked = false;
   if (s.tab === "circuits") showTab("circuits");
@@ -873,6 +901,7 @@ $("tabCircuitBtn").addEventListener("click", saveSettings);
 loadSettings();
 updateTotal();
 renderRoutineButtons();
+syncPresetSelection();
 // First run: leave the sound panel open until Test sound has been tapped
 // once, so the check is visible instead of hidden in a collapsed toggle.
 if (!storeGet("it-sound-tested")) {
