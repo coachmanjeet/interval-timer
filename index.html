@@ -50,6 +50,17 @@
   .controls button:active { opacity: 0.85; }
   .foot { text-align: center; color: #6b7280; font-size: 12px; margin-top: 24px; line-height: 1.5; }
   .foot a { color: #6b7280; }
+  /* Mode tabs + circuit picker */
+  .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+  .tabs button { flex: 1; padding: 12px; font-size: 16px; font-weight: 700; border: 0; border-radius: 12px; background: #374151; color: #9ca3af; cursor: pointer; }
+  .tabs button.active { background: #16a34a; color: #fff; }
+  .routines button { display: block; width: 100%; text-align: left; padding: 14px; margin-bottom: 8px; border: 0; border-radius: 12px; background: #374151; color: #fff; cursor: pointer; }
+  .routines button:last-child { margin-bottom: 0; }
+  .routines button:active { background: #4b5563; }
+  .r-name { font-size: 18px; font-weight: 700; }
+  .r-sum { font-size: 13px; color: #9ca3af; margin-top: 4px; }
+  .phase-label.station { font-size: 24px; letter-spacing: 1px; }
+  .next { font-size: 16px; color: #d1d5db; margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -60,6 +71,12 @@
     <h1>Interval Timer</h1>
     <p class="sub">Set it, press start, train. No account, no download.</p>
 
+    <div class="tabs">
+      <button id="tabTimerBtn" class="active">Timer</button>
+      <button id="tabCircuitBtn">Circuits</button>
+    </div>
+
+    <div id="timerSetup">
     <div class="card">
       <div class="presets">
         <button data-preset="30,30,8">30 / 30 &times; 8</button>
@@ -85,6 +102,23 @@
         </div>
       </div>
       <p class="total" id="totalLine"></p>
+    </div>
+
+    <button class="big-btn" id="startBtn">START</button>
+    </div>
+
+    <div id="circuitSetup" style="display:none">
+    <div class="card">
+      <div class="field">
+        <label for="circuitRoundsInput">Rounds (whole circuit)</label>
+        <input id="circuitRoundsInput" type="number" inputmode="numeric" min="1" max="10" value="3">
+      </div>
+      <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">60 seconds rest between rounds. Tap a routine to start it. The timer names each station and shows what comes next.</p>
+    </div>
+
+    <div class="card">
+      <div id="routineList" class="routines"></div>
+    </div>
     </div>
 
     <div class="card">
@@ -115,8 +149,7 @@
       <p style="font-size:13px;color:#9ca3af;margin:8px 0 0">Tap this first on your phone. You should hear a tick, then the voice say "Go". If you hear nothing, check the silent switch and volume.</p>
     </div>
 
-    <button class="big-btn" id="startBtn">START</button>
-    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v3: pre-recorded voice cues</p>
+    <p class="foot">Tip: on iPhone, Share &gt; Add to Home Screen puts this on your home screen like an app.<br>Music: Kevin MacLeod, licensed CC BY 4.0 (incompetech.com).<br>v4: circuits mode with pre-recorded station voice cues</p>
   </div>
 
   <!-- TIMER -->
@@ -125,6 +158,7 @@
       <div class="phase-label" id="phaseLabel">GET READY</div>
       <div class="clock" id="clock">0:05</div>
       <div class="round" id="roundLabel">Round 1 of 8</div>
+      <div class="next" id="nextLabel"></div>
       <div class="bar"><div id="barFill"></div></div>
     </div>
     <p class="elapsed" id="elapsedLine">Elapsed 0:00</p>
@@ -158,10 +192,10 @@
 </div>
 <audio id="musicWork" loop preload="none"></audio>
 <audio id="musicRest" loop preload="none"></audio>
-<audio id="cueReady" preload="auto" src="voice/get-ready.mp3"></audio>
-<audio id="cueGo" preload="auto" src="voice/go.mp3"></audio>
-<audio id="cueRest" preload="auto" src="voice/rest.mp3"></audio>
-<audio id="cueDone" preload="auto" src="voice/complete.mp3"></audio>
+<audio id="cueReady" preload="auto" data-cue src="voice/get-ready.mp3"></audio>
+<audio id="cueGo" preload="auto" data-cue src="voice/go.mp3"></audio>
+<audio id="cueRest" preload="auto" data-cue src="voice/rest.mp3"></audio>
+<audio id="cueDone" preload="auto" data-cue src="voice/complete.mp3"></audio>
 
 <script>
 "use strict";
@@ -273,6 +307,31 @@ function speakTTS(text) {
     else { say(); }
   } catch (e) {}
 }
+// Station names: pre-recorded file first (same path as the v3 cues), live
+// speech as fallback, so a missing file still names the station.
+var stationEls = null;
+function stationAudio() {
+  if (!stationEls) {
+    stationEls = {};
+    document.querySelectorAll("audio[data-station]").forEach(function (a) {
+      stationEls[a.getAttribute("data-station")] = a;
+    });
+  }
+  return stationEls;
+}
+function speakStation(name) {
+  if (!$("soundToggle").checked) return;
+  var a = stationAudio()[slugify(name)];
+  if (a) {
+    try {
+      a.currentTime = 0;
+      var p = a.play();
+      if (p && p.then) { p.then(function () {}, function () { speakTTS(name); }); }
+      return;
+    } catch (e) {}
+  }
+  speakTTS(name);
+}
 
 // ---------- Wake lock (screen stays awake) ----------
 var wakeLock = null;
@@ -289,6 +348,104 @@ var workSec = 30, restSec = 30, rounds = 8;
 var phase = "ready", round = 1, phaseTotal = 5000, remaining = 5000;
 var endAt = 0, timerId = null, running = false, paused = false;
 var lastTickSec = -1, elapsedMs = 0, elapsedBase = 0;
+// Phase-list engine: a workout is a list of phases built at start, so a
+// classic timer and a circuit share the same walk (ready, work, rest,
+// round rest, done). Circuit phases also carry station name, position,
+// and the next station, for display and voice.
+var phases = [], phaseIdx = 0;
+var circuitMode = false, circuitRounds = 3;
+var currentStation = null, currentStationIdx = 0, currentStationCount = 0, currentNext = null;
+
+// ---------- Circuits: preloaded routines ----------
+// Each station: name, work seconds, rest seconds after it (rest after the
+// last station of a round is skipped; roundRest applies between rounds).
+var ROUTINES = [
+  { name: "Full-Body Starter", roundRest: 60, stations: [
+    { name: "Squats", work: 40, rest: 20 },
+    { name: "Push-Ups", work: 40, rest: 20 },
+    { name: "Lunges", work: 40, rest: 20 },
+    { name: "Plank", work: 40, rest: 20 },
+    { name: "Glute Bridge", work: 40, rest: 20 },
+    { name: "Jumping Jacks", work: 40, rest: 20 } ] },
+  { name: "Core Blast", roundRest: 60, stations: [
+    { name: "Plank", work: 40, rest: 20 },
+    { name: "Dead Bug", work: 40, rest: 20 },
+    { name: "Bicycle Crunch", work: 40, rest: 20 },
+    { name: "Mountain Climbers", work: 40, rest: 20 },
+    { name: "Side Plank Left", work: 30, rest: 20 },
+    { name: "Side Plank Right", work: 30, rest: 20 } ] },
+  { name: "Lower-Body Burn", roundRest: 60, stations: [
+    { name: "Squats", work: 40, rest: 20 },
+    { name: "Lunges", work: 40, rest: 20 },
+    { name: "Glute Bridge", work: 40, rest: 20 },
+    { name: "Calf Raises", work: 40, rest: 20 },
+    { name: "Wall Sit", work: 40, rest: 20 },
+    { name: "Step-Back Lunge", work: 40, rest: 20 } ] },
+  { name: "Dumbbell Full-Body", roundRest: 60, stations: [
+    { name: "Goblet Squat", work: 40, rest: 20 },
+    { name: "Dumbbell Press", work: 40, rest: 20 },
+    { name: "Bent Row", work: 40, rest: 20 },
+    { name: "Romanian Deadlift", work: 40, rest: 20 },
+    { name: "Overhead Press", work: 40, rest: 20 },
+    { name: "Farmer Hold", work: 40, rest: 20 } ] }
+];
+function slugify(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+// One pre-recorded <audio> per unique station name, built from ROUTINES so
+// the map can never drift from the routines. Same approach as the v3 cues:
+// files play through the <audio> path iOS allows from timer callbacks.
+(function buildStationAudio() {
+  var seen = {};
+  ROUTINES.forEach(function (r) {
+    r.stations.forEach(function (s) {
+      var slug = slugify(s.name);
+      if (seen[slug]) return;
+      seen[slug] = true;
+      var a = document.createElement("audio");
+      a.setAttribute("data-station", slug);
+      a.setAttribute("preload", "auto");
+      a.src = "voice/stations/" + slug + ".mp3";
+      document.body.appendChild(a);
+    });
+  });
+})();
+function buildClassicPhases() {
+  var list = [{ type: "ready", ms: 5000, round: 1 }];
+  for (var r = 1; r <= rounds; r++) {
+    list.push({ type: "work", ms: workSec * 1000, round: r });
+    if (r < rounds && restSec > 0) {
+      list.push({ type: "rest", ms: restSec * 1000, round: r });
+    }
+  }
+  return list;
+}
+function buildCircuitPhases(routine, nRounds) {
+  var list = [{ type: "ready", ms: 5000, round: 1 }];
+  var stations = routine.stations;
+  for (var r = 1; r <= nRounds; r++) {
+    for (var i = 0; i < stations.length; i++) {
+      var st = stations[i];
+      list.push({ type: "work", ms: st.work * 1000, round: r, station: st.name, stationIdx: i + 1, stationCount: stations.length });
+      if (i < stations.length - 1 && st.rest > 0) {
+        list.push({ type: "rest", ms: st.rest * 1000, round: r, station: st.name, stationIdx: i + 1, stationCount: stations.length });
+      }
+    }
+    if (r < nRounds && routine.roundRest > 0) {
+      list.push({ type: "roundrest", ms: routine.roundRest * 1000, round: r });
+    }
+  }
+  // Next label for each phase: the next work station ahead, or round rest.
+  for (var k = 0; k < list.length; k++) {
+    var nxt = null;
+    for (var j = k + 1; j < list.length; j++) {
+      if (list[j].type === "work") { nxt = list[j].station; break; }
+      if (list[j].type === "roundrest") { nxt = "Round rest"; break; }
+    }
+    list[k].next = nxt;
+  }
+  return list;
+}
 
 function fmt(ms) {
   var s = Math.max(0, Math.ceil(ms / 1000));
@@ -330,7 +487,7 @@ function syncPair(a, b) {
   };
 }
 function activeAudio() {
-  if (phase === "rest") return restAudio;
+  if (phase === "rest" || phase === "roundrest") return restAudio;
   if (phase === "work") return workAudio;
   return null; // get-ready and done: clock sounds only, no music
 }
@@ -351,10 +508,12 @@ function applyMusic() {
   else { a.pause(); }
 }
 function unlockMusic() {
-  // Prime both audio elements inside the tap (muted) so later play()
+  // Prime audio elements inside the tap (muted) so later play()
   // calls from the timer are allowed on iOS.
   applyMusic();
-  [workAudio, restAudio, $("cueReady"), $("cueGo"), $("cueRest"), $("cueDone")].forEach(function (a) {
+  var els = [workAudio, restAudio];
+  document.querySelectorAll("audio[data-cue], audio[data-station]").forEach(function (a) { els.push(a); });
+  els.forEach(function (a) {
     if (!a.getAttribute("src")) return;
     try {
       var v = a.volume; a.volume = 0;
@@ -373,35 +532,51 @@ $("musicRestSelect2").addEventListener("change", syncPair("musicRestSelect2", "m
 function showPhase() {
   var box = $("phaseBox");
   box.className = "phase " + phase;
-  $("phaseLabel").textContent =
+  var label = $("phaseLabel");
+  label.className = "phase-label" + (phase === "work" && currentStation ? " station" : "");
+  label.textContent =
     phase === "ready" ? "GET READY" :
-    phase === "work" ? "WORK" :
-    phase === "rest" ? "RECOVER" : "DONE";
-  $("roundLabel").textContent = phase === "done" ? "Workout complete" : "Round " + round + " of " + rounds;
+    phase === "work" ? (currentStation ? currentStation.toUpperCase() : "WORK") :
+    phase === "rest" ? "RECOVER" :
+    phase === "roundrest" ? "ROUND REST" : "DONE";
+  if (phase === "done") {
+    $("roundLabel").textContent = "Workout complete";
+  } else if (circuitMode) {
+    $("roundLabel").textContent = "Round " + round + " of " + circuitRounds +
+      (currentStation ? " · Station " + currentStationIdx + " of " + currentStationCount : "");
+  } else {
+    $("roundLabel").textContent = "Round " + round + " of " + rounds;
+  }
+  $("nextLabel").textContent = (circuitMode && currentNext) ? "Next: " + currentNext : "";
 }
 function render() {
   $("clock").textContent = fmt(remaining);
   $("barFill").style.width = (100 * (1 - remaining / phaseTotal)) + "%";
   $("elapsedLine").textContent = "Elapsed " + fmt(elapsedMs + (paused ? 0 : (Date.now() - elapsedBase)));
 }
-function setPhase(p, ms) {
-  phase = p; phaseTotal = ms; remaining = ms;
-  endAt = Date.now() + ms; lastTickSec = -1;
+function enterPhase(i) {
+  phaseIdx = i;
+  var p = phases[i];
+  phase = p.type; round = p.round;
+  currentStation = p.station || null;
+  currentStationIdx = p.stationIdx || 0;
+  currentStationCount = p.stationCount || 0;
+  currentNext = p.next || null;
+  phaseTotal = p.ms; remaining = p.ms;
+  endAt = Date.now() + p.ms; lastTickSec = -1;
   showPhase();
+  if (p.type === "ready") { speak("Get ready"); }
+  if (p.type === "work") { workSound(); if (currentStation) speakStation(currentStation); else speak("Go"); }
+  if (p.type === "rest" || p.type === "roundrest") { restSound(); speak("Rest"); }
+  applyMusic();
 }
 function advance() {
-  if (phase === "ready") { setPhase("work", workSec * 1000); workSound(); speak("Go"); applyMusic(); return; }
-  if (phase === "work") {
-    if (round >= rounds) { finish(); return; }
-    if (restSec > 0) { setPhase("rest", restSec * 1000); restSound(); speak("Rest"); applyMusic(); }
-    else { round++; setPhase("work", workSec * 1000); workSound(); speak("Go"); }
-    return;
-  }
-  if (phase === "rest") { round++; setPhase("work", workSec * 1000); workSound(); speak("Go"); applyMusic(); }
+  if (phaseIdx + 1 < phases.length) { enterPhase(phaseIdx + 1); return; }
+  finish();
 }
 function finish() {
   clearInterval(timerId); timerId = null; running = false; paused = false;
-  phase = "done"; remaining = 0; showPhase(); render();
+  phase = "done"; remaining = 0; currentNext = null; showPhase(); render();
   stopMusic();
   if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
   finishSound(); speak("Workout complete");
@@ -425,15 +600,25 @@ function tickFn() {
 }
 function startTimer() {
   updateTotal();
+  circuitMode = false;
+  phases = buildClassicPhases();
+  beginWorkout();
+}
+function startCircuit(idx) {
+  circuitRounds = Math.min(10, Math.max(1, parseInt($("circuitRoundsInput").value, 10) || 3));
+  circuitMode = true;
+  phases = buildCircuitPhases(ROUTINES[idx], circuitRounds);
+  beginWorkout();
+}
+function beginWorkout() {
   $("setupView").style.display = "none";
   $("timerView").style.display = "block";
   $("musicSelect2").value = $("musicSelect").value;
   $("musicRestSelect2").value = $("musicRestSelect").value;
   unlockAudio(); // unlock audio on the tap
   unlockMusic(); // prime music elements so later play() calls are allowed on iOS
-  speak("Get ready"); // also unlocks voice output on iOS for later cues
-  running = true; paused = false; round = 1; elapsedMs = 0; elapsedBase = Date.now();
-  setPhase("ready", 5000);
+  running = true; paused = false; elapsedMs = 0; elapsedBase = Date.now();
+  enterPhase(0); // get-ready, which also speaks the first cue in the tap
   timerId = setInterval(tickFn, 100);
   requestWake();
   applyMusic();
@@ -470,11 +655,10 @@ $("pauseBtn").addEventListener("click", pauseToggle);
 $("skipBtn").addEventListener("click", function () { if (running && !paused) advance(); });
 $("restartBtn").addEventListener("click", function () {
   clearInterval(timerId);
-  running = true; paused = false; round = 1; elapsedMs = 0; elapsedBase = Date.now();
-  setPhase("ready", 5000);
+  running = true; paused = false; elapsedMs = 0; elapsedBase = Date.now();
+  enterPhase(0);
   timerId = setInterval(tickFn, 100);
   unlockAudio();
-  speak("Get ready");
   applyMusic();
   $("pauseBtn").textContent = "Pause";
 });
@@ -485,6 +669,47 @@ $("endBtn").addEventListener("click", function () {
   $("timerView").style.display = "none";
   $("setupView").style.display = "block";
 });
+
+// ---------- Circuits setup: tabs + routine picker ----------
+function showTab(which) {
+  $("timerSetup").style.display = which === "timer" ? "block" : "none";
+  $("circuitSetup").style.display = which === "circuits" ? "block" : "none";
+  $("tabTimerBtn").className = which === "timer" ? "active" : "";
+  $("tabCircuitBtn").className = which === "circuits" ? "active" : "";
+}
+$("tabTimerBtn").addEventListener("click", function () { showTab("timer"); });
+$("tabCircuitBtn").addEventListener("click", function () { showTab("circuits"); });
+function routineTotalSec(routine, nRounds) {
+  var perRound = 0;
+  routine.stations.forEach(function (s, i) {
+    perRound += s.work;
+    if (i < routine.stations.length - 1) perRound += s.rest;
+  });
+  return 5 + nRounds * perRound + (nRounds - 1) * routine.roundRest;
+}
+function renderRoutineButtons() {
+  var nRounds = Math.min(10, Math.max(1, parseInt($("circuitRoundsInput").value, 10) || 3));
+  var list = $("routineList");
+  list.innerHTML = "";
+  ROUTINES.forEach(function (r, idx) {
+    var minWork = Math.min.apply(null, r.stations.map(function (s) { return s.work; }));
+    var maxWork = Math.max.apply(null, r.stations.map(function (s) { return s.work; }));
+    var workRange = minWork === maxWork ? minWork + "s" : minWork + "-" + maxWork + "s";
+    var minRest = Math.min.apply(null, r.stations.map(function (s) { return s.rest; }));
+    var maxRest = Math.max.apply(null, r.stations.map(function (s) { return s.rest; }));
+    var restRange = minRest === maxRest ? minRest + "s" : minRest + "-" + maxRest + "s";
+    var b = document.createElement("button");
+    var name = document.createElement("div"); name.className = "r-name"; name.textContent = r.name;
+    var sum = document.createElement("div"); sum.className = "r-sum";
+    sum.textContent = r.stations.length + " stations · " + workRange + " work / " + restRange + " rest · " +
+      nRounds + " rounds · about " + Math.round(routineTotalSec(r, nRounds) / 60) + " min";
+    b.appendChild(name); b.appendChild(sum);
+    b.addEventListener("click", function () { startCircuit(idx); });
+    list.appendChild(b);
+  });
+}
+$("circuitRoundsInput").addEventListener("input", renderRoutineButtons);
+renderRoutineButtons();
 </script>
 </body>
 </html>
